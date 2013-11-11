@@ -276,8 +276,8 @@ lapic_init(void)
 	LAPIC_INIT();
 
 	kprintf("ID: 0x%x LDR: 0x%x\n", LAPIC_READ(ID), LAPIC_READ(LDR));
-	if ((LAPIC_READ(VERSION)&LAPIC_VERSION_MASK) < 0x14) {
-		panic("Local APIC version 0x%x, 0x14 or more expected\n",
+	if ((LAPIC_READ(VERSION)&LAPIC_VERSION_MASK) < 0x10) {
+		panic("Local APIC version 0x%x, 0x10 or more expected\n",
 			(LAPIC_READ(VERSION)&LAPIC_VERSION_MASK));
 	}
 

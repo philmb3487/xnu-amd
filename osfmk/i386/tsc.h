@@ -44,6 +44,11 @@
 #define IA32_PERF_STS		0x198
 #define	SLOW_TSC_THRESHOLD	1000067800	/* if slower, nonzero shift required in nanotime() algorithm */
 
+/* mercurysquad: MSRs for AMD support (getting bus ratio) */
+#define AMD_PERF_STS	0xC0010042	/* AMD's version of the MSR */
+#define AMD_PSTATE0_STS	0xC0010064	/* K10/phenom class AMD cpus */
+#define AMD_COFVID_STS	0xC0010071	/* This might be a better MSR for K10? */
+
 #ifndef ASSEMBLER
 extern uint64_t	busFCvtt2n;
 extern uint64_t	busFCvtn2t;
@@ -53,6 +58,7 @@ extern uint64_t tscFCvtn2t;
 extern uint64_t tscGranularity;
 extern uint64_t bus2tsc;
 extern uint64_t busFreq;
+extern uint32_t kTscPanicOn;
 extern uint32_t	flex_ratio;
 extern uint32_t	flex_ratio_min;
 extern uint32_t	flex_ratio_max;

@@ -1058,6 +1058,9 @@ user_trap(
 		break;
 
 	    case T_INVALID_OPCODE:
+		/* Sinetek: we'll handle this. */
+		opemu_trap(saved_state);
+
 		exc = EXC_BAD_INSTRUCTION;
 		code = EXC_I386_INVOP;
 		break;

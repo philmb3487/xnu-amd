@@ -72,6 +72,7 @@ uint64_t	tscFCvtn2t = 0;
 uint64_t	tscGranularity = 0;
 uint64_t	bus2tsc = 0;
 uint64_t	busFreq = 0;
+uint32_t	kTscPanicOn = 0;
 uint32_t	flex_ratio = 0;
 uint32_t	flex_ratio_min = 0;
 uint32_t	flex_ratio_max = 0;
@@ -88,9 +89,31 @@ uint32_t	flex_ratio_max = 0;
 #define Tera (kilo * Giga)
 #define Peta (kilo * Tera)
 
-#define CPU_FAMILY_PENTIUM_M	(0x6)
+/* mercurysquad: The following enum specifies one of the bus ratio calc paths to take */
+typedef enum {
+	BUSRATIO_BOOTFLAG,
+	BUSRATIO_ATHLON,
+	BUSRATIO_EFI,
+	BUSRATIO_PHENOM_SHANGHAI,
+	BUSRATIO_INTEL_MSR,
+	BUSRATIO_AUTODETECT,
+	BUSRATIO_PENTIUM4_MSR, // P4 model 2+ have an MSR too
+	BUSRATIO_TIMER
+} busratio_path_t;
+
+static const char* busRatioPathNames[] = {
+	"Boot-time argument",
+	"AMD Athlon",
+	"Pentium 4 (via EFI)",
+	"AMD Phenom",
+	"Intel / Apple",
+	"Autodetect",
+	"Pentium 4 (via MSR)",
+	"Time the TSC"
+};
 
 static const char	FSB_Frequency_prop[] = "FSBFrequency";
+static const char  FSB_CPUFrequency_prop[] = "CPUFrequency";
 /*
  * This routine extracts the bus frequency in Hz from the device tree.
  */
@@ -124,6 +147,87 @@ EFI_FSB_frequency(void)
 	}
 	return frequency;
 }
+/* mercurysquad:
+ * This routine extracts the cpu frequency from the efi device tree
+ * The value should be set by a custom EFI bootloader (only needed on CPUs which
+ * don't report the bus ratio in one of the MSRs.)
+ */
+static uint64_t
+EFI_CPU_Frequency(void)
+{
+	uint64_t	frequency = 0;
+	DTEntry		entry;
+	void		*value;
+	unsigned int	size;
+	
+	if (DTLookupEntry(0, "/efi/platform", &entry) != kSuccess) {
+		kprintf("EFI_CPU_Frequency: didn't find /efi/platform\n");
+		return 0;
+	}
+	if (DTGetProperty(entry,FSB_CPUFrequency_prop,&value,&size) != kSuccess) {
+		kprintf("EFI_CPU_Frequency: property %s not found\n",
+			FSB_Frequency_prop);
+		return 0;
+	}
+	if (size == sizeof(uint64_t)) {
+		frequency = *(uint64_t *) value;
+		kprintf("EFI_CPU_Frequency: read %s value: %llu\n",
+			FSB_Frequency_prop, frequency);
+		if (!(10*Mega < frequency && frequency < 50*Giga)) {
+			kprintf("EFI_Fake_MSR: value out of range\n");
+			frequency = 0;
+		}
+	} else {
+		kprintf("EFI_CPU_Frequency: unexpected size %d\n", size);
+	}
+	return frequency;
+}
+
+/*
+ * Convert the cpu frequency info into a 'fake' MSR198h in Intel format
+ */
+static uint64_t
+getFakeMSR(uint64_t frequency, uint64_t bFreq) {
+	uint64_t fakeMSR = 0ull;
+	uint64_t multi = 0;
+	
+	if (frequency == 0 || bFreq == 0)
+		return 0;
+	
+	multi = frequency / (bFreq / 1000); // = multi*1000
+	// divide by 1000, rounding up if it was x.75 or more
+	// Example: 12900 will get rounded to 13150/1000 = 13
+	//          but 12480 will be 12730/1000 = 12
+	fakeMSR = (multi + 250) / 1000;
+	fakeMSR <<= 40; // push multiplier into bits 44 to 40
+	
+	// If fractional part was within (0.25, 0.75), set N/2
+	if ((multi % 1000 > 250) && (multi % 1000 < 750))
+		fakeMSR |= (1ull << 46);
+
+	return fakeMSR;
+}
+
+int ForceAmdCpu = 0;
+
+/* Handy functions to check what platform we're on */
+boolean_t IsAmdCPU(void) {
+	if (ForceAmdCpu) return TRUE;
+	
+	uint32_t ourcpuid[4];
+	do_cpuid(0, ourcpuid);
+	if (ourcpuid[ebx] == 0x68747541 &&
+	    ourcpuid[ecx] == 0x444D4163 &&
+	    ourcpuid[edx] == 0x69746E65)
+		return TRUE;
+	else
+		return FALSE;
+};
+
+boolean_t IsIntelCPU(void) {
+	return !IsAmdCPU(); // dirty hack
+}
+
 
 /*
  * Initialize the various conversion factors needed by code referencing
@@ -193,22 +297,197 @@ tsc_init(void)
 		if (busFreq == 0)
 		    busFreq = BASE_NHM_CLOCK_SOURCE;
 
-		break;
             }
+		break;
 	default: {
-		uint64_t	prfsts;
+	/*
+ 	 * mercurysquad: The bus ratio is crucial to setting the proper rtc increment.
+ 	 * There are several methods so we first check any bootlfags. If none is specified, we choose
+ 	 * based on the CPU type.
+  	 */
+ 	uint64_t cpuFreq = 0, prfsts = 0, boot_arg = 0;
+ 	busratio_path_t busRatioPath = BUSRATIO_AUTODETECT;
+ 	
+ 	if (PE_parse_boot_argn("busratiopath", &boot_arg, sizeof(boot_arg)))
+ 		busRatioPath = (busratio_path_t) boot_arg;
+ 	else
+ 		busRatioPath = BUSRATIO_AUTODETECT;
+	
+ 	if (PE_parse_boot_argn("busratio", &tscGranularity, sizeof(tscGranularity)))
+ 		busRatioPath = BUSRATIO_BOOTFLAG;
+ 	
+ 	if (busRatioPath == BUSRATIO_AUTODETECT) {
+ 		/* This happens if no bootflag above was specified.
+ 		 * We'll choose based on CPU type */
+ 		switch (cpuid_info()->cpuid_family) {
+ 			case CPU_FAMILY_PENTIUM_4:
+ 				/* This could be AMD Athlon or Intel P4 as both have family Fh */
+ 				if (IsAmdCPU())
+ 					busRatioPath = BUSRATIO_ATHLON;
+ 				else if (cpuid_info()->cpuid_model < 2 )
+ 					/* These models don't implement proper MSR 198h or 2Ch */
+ 					busRatioPath = BUSRATIO_TIMER;
+ 				else if (cpuid_info()->cpuid_model == 2)
+ 					/* This model has an MSR we can use */
+ 					busRatioPath = BUSRATIO_PENTIUM4_MSR;
+ 				else /* 3 or higher */
+ 					/* Other models should implement MSR 198h */
+ 					busRatioPath = BUSRATIO_INTEL_MSR;
+ 				break;
+ 			case CPU_FAMILY_PENTIUM_M:
+ 				if (cpuid_info()->cpuid_model >= 0xD)
+ 					/* Pentium M or Core and above can use Apple method*/
+ 					busRatioPath = BUSRATIO_INTEL_MSR;
+ 				else
+ 					/* Other Pentium class CPU, use safest option */
+ 					busRatioPath = BUSRATIO_TIMER;
+ 				break;
+ 			case CPU_FAMILY_AMD_PHENOM:
+ 			case CPU_FAMILY_AMD_SHANGHAI:
+ 				/* These have almost the same method, with a minor difference */
+ 				busRatioPath = BUSRATIO_PHENOM_SHANGHAI;
+ 				break;
+ 			default:
+ 				/* Fall back to safest method */
+ 				busRatioPath = BUSRATIO_TIMER;
+ 		};
+ 	}
+ 	
+ 	/* 
+ 	 * Now that we have elected a bus ratio path, we can proceed to calculate it.
+ 	 */
+ 	printf("rtclock_init: Taking bus ratio path %d (%s)\n",
+ 	       busRatioPath, busRatioPathNames[busRatioPath]);
+ 	switch (busRatioPath) {
+ 		case BUSRATIO_BOOTFLAG:
+ 			/* tscGranularity was already set. However, check for N/2. N/2 is specified by
+ 			 * giving a busratio of 10 times what it is (so last digit is 5). We set a cutoff
+ 			 * of 30 before deciding it's n/2. TODO: find a better way */
+ 			if (tscGranularity == 0) tscGranularity = 1; // avoid div by zero
+ 			N_by_2_bus_ratio = (tscGranularity > 30) && ((tscGranularity % 10) != 0);
+ 			if (N_by_2_bus_ratio) tscGranularity /= 10; /* Scale it back to normal */
+ 			break;
+#ifndef __i386__ //AnV: in case of x86_64 boot default for busratio timer to EFI value
+		case BUSRATIO_TIMER:
+#endif
+ 		case BUSRATIO_EFI:
+ 			/* This uses the CPU frequency exported into EFI by the bootloader */
+ 			cpuFreq = EFI_CPU_Frequency();
+ 			prfsts  = getFakeMSR(cpuFreq, busFreq);
+			tscGranularity = (uint32_t)bitfield(prfsts, 44, 40);
+ 			N_by_2_bus_ratio = prfsts & bit(46);
+ 			break;
+ 		case BUSRATIO_INTEL_MSR:
+ 			/* This will read the performance status MSR on intel systems (Apple method) */
+ 			prfsts = rdmsr64(IA32_PERF_STS);
+ 			tscGranularity	= (uint32_t)bitfield(prfsts, 44, 40);
+ 			N_by_2_bus_ratio= prfsts & bit(46);
+ 			break;
+ 		case BUSRATIO_ATHLON:
+ 			/* Athlons specify the bus ratio directly in an MSR using a simple formula */
+ 			prfsts		= rdmsr64(AMD_PERF_STS);
+ 			tscGranularity  = 4 + bitfield(prfsts, 5, 1);
+ 			N_by_2_bus_ratio= prfsts & bit(0); /* FIXME: This is experimental! */
+ 			break;
+ 		case BUSRATIO_PENTIUM4_MSR:
+ 			prfsts		= rdmsr64(0x2C); // TODO: Add to header
+ 			tscGranularity	= bitfield(prfsts, 31, 24);
+ 			break;
+ 		case BUSRATIO_PHENOM_SHANGHAI:
+ 			/* Phenoms and Shanghai processors have a different MSR to read the frequency
+ 			 * multiplier and divisor, from which the cpu frequency can be calculated.
+ 			 * This can then be used to construct the fake MSR. */
+ 			prfsts		= rdmsr64(AMD_COFVID_STS);
+ 			printf("rtclock_init: Phenom MSR 0x%x returned: 0x%llx\n", AMD_COFVID_STS, prfsts);
+ 			uint64_t cpuFid = bitfield(prfsts, 5, 0);
+ 			uint64_t cpuDid = bitfield(prfsts, 8, 6);
+ 			/* The base for Fid could be either 8 or 16 depending on the cpu family */
+ 			if (cpuid_info()->cpuid_family == CPU_FAMILY_AMD_PHENOM)
+ 				cpuFreq = (100 * Mega * (cpuFid + 0x10)) >> cpuDid;
+ 			else /* shanghai */
+ 				cpuFreq = (100 * Mega * (cpuFid + 0x08)) >> cpuDid;
+ 			prfsts = getFakeMSR(cpuFreq, busFreq);
+ 			tscGranularity = (uint32_t)bitfield(prfsts, 44, 40);
+ 			N_by_2_bus_ratio = prfsts & bit(46);
+ 			break;
+#ifdef __i386__ //qoopz: no get_PIT2 for x86_64
+ 		case BUSRATIO_TIMER:
+ 			/* Fun fun fun. :-|  */
+ 			cpuFreq = timeRDTSC() * 20;
+ 			prfsts = getFakeMSR(cpuFreq, busFreq);
+ 			tscGranularity = (uint32_t)bitfield(prfsts, 44, 40);
+ 			N_by_2_bus_ratio = prfsts & bit(46);
+ 			break;
+#endif
+ 		case BUSRATIO_AUTODETECT:
+ 		default:
+ 			kTscPanicOn = 1; /* see sanity check below */
+ 	};
 
-		prfsts = rdmsr64(IA32_PERF_STS);
-		tscGranularity = (uint32_t)bitfield(prfsts, 44, 40);
-		N_by_2_bus_ratio = (prfsts & bit(46)) != 0;
+#ifdef __i386__
+ 	/* Verify */
+ 	if (!PE_parse_boot_argn("-notscverify", &boot_arg, sizeof(boot_arg))) {
+ 		uint64_t realCpuFreq = timeRDTSC() * 20;
+ 		cpuFreq = tscGranularity * busFreq;
+ 		if (N_by_2_bus_ratio) cpuFreq += (busFreq / 2);
+ 		uint64_t difference = 0;
+ 		if (realCpuFreq > cpuFreq)
+ 			difference = realCpuFreq - cpuFreq;
+ 		else
+ 			difference = cpuFreq - realCpuFreq;
+ 		
+ 		if (difference >= 4*Mega) {
+ 			// Shouldn't have more than 4MHz difference. This is about 2-3% of most FSBs.
+ 			// Fall back to using measured speed and correct the busFreq
+ 			// Note that the tscGran was read from CPU so should be correct.
+ 			// Only on Phenom the tscGran is calculated by dividing by busFreq.
+ 			printf("TSC: Reported FSB: %4d.%04dMHz, ", (uint32_t)(busFreq / Mega), (uint32_t)(busFreq % Mega));
+ 			if (N_by_2_bus_ratio)
+ 				busFreq = (realCpuFreq * 2) / (1 + 2*tscGranularity);
+ 			else
+ 				busFreq = realCpuFreq / tscGranularity;
+ 			printf("corrected FSB: %4d.%04dMHz\n", (uint32_t)(busFreq / Mega), (uint32_t)(busFreq % Mega));
+ 			// Reset the busCvt factors
+ 			busFCvtt2n = ((1 * Giga) << 32) / busFreq;
+ 			busFCvtn2t = 0xFFFFFFFFFFFFFFFFULL / busFCvtt2n;
+ 			busFCvtInt = tmrCvt(1 * Peta, 0xFFFFFFFFFFFFFFFFULL / busFreq);
+ 			printf("TSC: Verification of clock speed failed. "
+ 			       "Fallback correction was performed. Please upgrade bootloader.\n");
+ 		} else {
+ 			printf("TSC: Verification of clock speed PASSED.\n");
+ 		}
+ 	}
+#else
+	printf("TSC: Verification of clock speed not available in x86_64.\n");
+#endif
+ 	
+ 	/* Do a sanity check of the granularity */
+ 	if ((tscGranularity == 0) ||
+ 	    (tscGranularity > 30) ||
+ 	    (busFreq < 50*Mega) ||
+ 	    (busFreq > 1*Giga) ||
+ 	    /* The following is useful to force a panic to print diagnostic info */
+ 	    PE_parse_boot_argn("-tscpanic", &boot_arg, sizeof(boot_arg)))
+ 	{
+ 		printf("\n\n");
+ 		printf(" >>> The real-time clock was not properly initialized on your system!\n");
+ 		printf("     Contact Voodoo Software for further information.\n");
+ 		kTscPanicOn = 1; /* Later when the console is initialized, this will show up, and we'll halt */
+ 		if (tscGranularity == 0) tscGranularity = 1; /* to avoid divide-by-zero in the following few lines */
+	}
+
 	    }
+		break;
 	}
 
 	if (busFreq != 0) {
 		busFCvtt2n = ((1 * Giga) << 32) / busFreq;
 		busFCvtn2t = 0xFFFFFFFFFFFFFFFFULL / busFCvtt2n;
 	} else {
-		panic("tsc_init: EFI not supported!\n");
+  		/* Instead of panicking, set a default FSB frequency */
+  		busFreq = 133*Mega;
+ 		kprintf("rtclock_init: Setting fsb to %u MHz\n", (uint32_t) (busFreq/Mega));
+	
 	}
 
 	kprintf(" BUS: Frequency = %6d.%06dMHz, "

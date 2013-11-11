@@ -38,6 +38,21 @@
  * Version 2.0.
  */
 
+/* Sinetek: Array of blacklisted Kexts.
+ * Should be moved somewhere convenient?
+ */
+const char *blak [] = {
+	"com.apple.driver.AppleIntelMeromProfile",
+	"com.apple.driver.AppleIntelNehalemProfile",
+	"com.apple.driver.AppleIntelPenrynProfile",
+	"com.apple.driver.AppleIntelYonahProfile",
+	"com.apple.driver.AppleIntelCPUPowerManagement",
+	"com.apple.iokit.CHUDKernLib",
+	"com.apple.iokit.CHUDProf",
+	"com.apple.iokit.CHUDUtils",
+	0, // terminate!
+};
+
 extern "C" {
 #include <machine/machine_routines.h>
 #include <libkern/kernel_mach_header.h>
@@ -331,6 +346,30 @@ bool IOCatalogue::addDrivers(
             result = false;
             break;
         }
+
+	/* Sinetek: if the kext is in blacklist, skip it TODO make this a function */
+	boolean_t blacklistEnabled = TRUE;
+	printf("BLACKLIST %s\n", blacklistEnabled? "enabled" : "disabled");
+	if(blacklistEnabled) {
+		OSString *moduleName = OSDynamicCast(OSString, personality->getObject(gIOModuleIdentifierKey));
+		const char *cName = NULL;
+		cName = moduleName->getCStringNoCopy();
+		boolean_t blackPersonality = FALSE;
+
+		if(cName) {
+			for(int i = 0; blak[i] != NULL; ++i) {
+				int equal;
+				equal = !strcmp(blak[i], cName);
+				if(equal) {
+					printf("Skipping personality %s", cName);
+					blackPersonality = TRUE;
+				}
+			}
+		}
+
+		if(blackPersonality) continue;
+	}
+	/* end Sinetek */
 
         OSKext::uniquePersonalityProperties(personality);
 
@@ -840,6 +879,31 @@ bool IOCatalogue::resetAndAddDrivers(OSArray * drivers, bool doNubMatching)
           (thisNewPersonality = (OSDictionary *) newPersonalities->getObject(newIdx)); 
           newIdx++)
      {
+ 	/* Sinetek: if the kext is in blacklist, skip it TODO make this a function */
+ 	boolean_t blacklistEnabled = TRUE;
+ 	printf("BLACKLIST %s\n", blacklistEnabled? "enabled" : "disabled");
+ 	if(blacklistEnabled) {
+ 		OSString *moduleName = OSDynamicCast(OSString, thisNewPersonality->getObject(gIOModuleIdentifierKey));
+ 		const char *cName = NULL;
+ 		cName = moduleName->getCStringNoCopy();
+ 		boolean_t blackPersonality = FALSE;
+ 
+ 		if(cName) {
+ 			for(int i = 0; blak[i] != NULL; ++i) {
+ 				int equal;
+ 				equal = !strcmp(blak[i], cName);
+ 				if(equal) {
+ 					printf("Skipping personality %s", cName);
+ 					blackPersonality = TRUE;
+ 				}
+ 			}
+ 		}
+ 
+ 		if(blackPersonality) continue;
+ 	}
+ 	/* end Sinetek */
+	
+
          OSKext::uniquePersonalityProperties(thisNewPersonality);
          addPersonality(thisNewPersonality);
          matchSet->setObject(thisNewPersonality);

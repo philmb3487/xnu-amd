@@ -243,11 +243,11 @@ KC++ := $(CXX)
 # Compiler warning flags
 #
 
-CWARNFLAGS_STD = \
-	-Wall -Werror -Wno-format-y2k -Wextra -Wstrict-prototypes \
-	-Wmissing-prototypes -Wpointer-arith -Wreturn-type -Wcast-qual \
-	-Wwrite-strings -Wswitch -Wshadow -Wcast-align -Wchar-subscripts \
-	-Winline -Wnested-externs -Wredundant-decls -Wextra-tokens
+#CWARNFLAGS_STD = \
+#	-Wall -Werror -Wno-format-y2k -Wextra -Wstrict-prototypes \
+#	-Wmissing-prototypes -Wpointer-arith -Wreturn-type -Wcast-qual \
+#	-Wwrite-strings -Wswitch -Wshadow -Wcast-align -Wchar-subscripts \
+#	-Winline -Wnested-externs -Wredundant-decls -Wextra-tokens
 
 # Certain warnings are non-fatal (8474835)
 CWARNFLAGS_STD += -Wno-error=cast-align
@@ -259,10 +259,10 @@ define add_perfile_cflags
 $(1)_CWARNFLAGS_ADD += $2
 endef
 
-CXXWARNFLAGS_STD = \
-	-Wall -Werror -Wno-format-y2k -Wextra -Wpointer-arith -Wreturn-type \
-	-Wcast-qual -Wwrite-strings -Wswitch -Wcast-align -Wchar-subscripts \
-	-Wredundant-decls -Wextra-tokens
+#CXXWARNFLAGS_STD = \
+#	-Wall -Werror -Wno-format-y2k -Wextra -Wpointer-arith -Wreturn-type \
+#	-Wcast-qual -Wwrite-strings -Wswitch -Wcast-align -Wchar-subscripts \
+#	-Wredundant-decls -Wextra-tokens
 
 # Certain warnings are non-fatal (8474835, 9000888)
 CXXWARNFLAGS_STD += -Wno-error=cast-align -Wno-error=overloaded-virtual
@@ -337,13 +337,13 @@ CFLAGS_ARM		+= -mthumb
 endif
 
 
-export CFLAGS_RELEASEI386 = -O2
-export CFLAGS_DEVELOPMENTI386 = -O2
+export CFLAGS_RELEASEI386 = -O2 -march=k8
+export CFLAGS_DEVELOPMENTI386 = -O2 -march=k8
 export CFLAGS_DEBUGI386 = -O0
 export CFLAGS_PROFILEI386 = -O2
 
-export CFLAGS_RELEASEX86_64 = -O2
-export CFLAGS_DEVELOPMENTX86_64 = -O2
+export CFLAGS_RELEASEX86_64 = -O3 -march=k8
+export CFLAGS_DEVELOPMENTX86_64 = -O2 -march=k8
 # No space optimization for the DEBUG kernel for the benefit of gdb:
 export CFLAGS_DEBUGX86_64 = -O0
 export CFLAGS_PROFILEX86_64 = -O2

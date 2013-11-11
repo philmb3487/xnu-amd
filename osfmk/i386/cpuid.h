@@ -179,6 +179,14 @@
 #define CPUID_MODEL_HASWELL_ULT	0x45
 #define CPUID_MODEL_CRYSTALWELL	0x46
 
+/* kaitek: the following definitions are needed by tsc.c and kern_mib.c */
+#define CPU_FAMILY_PENTIUM_M	(0x6)
+#define CPU_FAMILY_PENTIUM_4	(0xF)
+#define CPU_FAMILY_AMD_PHENOM	(0x10)
+#define CPU_FAMILY_AMD_SHANGHAI	(0x11)
+#define CPU_FAMILY_I5		(0x1E)
+#define CPU_FAMILY_I9		(0x2C)
+#define CPU_FAMILY_SANDY	(0x2A)
 
 #define CPUID_VMM_FAMILY_UNKNOWN	0x0
 #define CPUID_VMM_FAMILY_VMWARE		0x1
@@ -370,6 +378,8 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
+extern boolean_t	IsAmdCPU(void);
+extern boolean_t	IsIntelCPU(void);
 
 /*
  * External declarations

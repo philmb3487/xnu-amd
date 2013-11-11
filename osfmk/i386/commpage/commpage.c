@@ -223,7 +223,7 @@ commpage_init_cpu_capabilities( void )
 			bits |= kHasSupplementalSSE3;
 			/* fall thru */
 		case 5:
-			bits |= kHasSSE3;
+			bits |= kHasSSE3 | kHasSupplementalSSE3 | kHasSSE4_2;
 			/* fall thru */
 		case 4:
 			bits |= kHasSSE2;

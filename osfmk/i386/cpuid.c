@@ -264,6 +264,135 @@ static const char *cache_type_str[LCACHE_MAX] = {
 	"Lnone", "L1I", "L1D", "L2U", "L3U"
 };
 
+/* Sinetek: reimplemented, based on AnV, mercurySquad, thanks go to them.
+ * Function is AMD-specific.
+ */
+static void
+cpuid_set_AMDcache_info( i386_cpu_info_t * info_p )
+{
+	uint32_t	reg[4];
+	uint32_t	linesizes[LCACHE_MAX];
+	cache_type_t	type;
+	uint32_t	j;
+	uint32_t	colors;
+
+	bzero( linesizes, sizeof(linesizes) );
+
+	/* get number of cores in processor */
+	/* No HT on AMD so logicals = cores */ 
+	cpuid_fn(0x80000008, reg);
+	info_p->cpuid_cores_per_package = bitfield32(reg[ecx], 7, 0) + 1;
+	info_p->cpuid_logical_per_package = info_p->cpuid_cores_per_package;
+
+
+	/* L1 Data */
+	{
+		type = L1D;
+		cpuid_fn(0x80000005, reg);
+		uint32_t cpuid_c_linesize	= bitfield32(reg[ecx], 7,  0);
+		uint32_t cpuid_c_partitions	= bitfield32(reg[ecx], 15, 8);
+		uint32_t cpuid_c_associativity	= bitfield32(reg[ecx], 23, 16);
+		uint32_t cpuid_c_size		= bitfield32(reg[ecx], 31, 24);
+
+		uint32_t cache_associativity	= cpuid_c_associativity;
+
+		// size reported in KB.
+		info_p->cache_size[type]  	= cpuid_c_size * 1024;
+		info_p->cache_sharing[type] 	= 1;
+		info_p->cache_partitions[type]	= cpuid_c_partitions;
+
+		linesizes[type] = cpuid_c_linesize;
+		uint32_t cache_sets = info_p->cache_size[type] / (cpuid_c_partitions * cpuid_c_linesize * cache_associativity);
+
+		colors = ( cpuid_c_linesize * cache_sets ) >> 12;
+		if ( colors > vm_cache_geometry_colors )
+			vm_cache_geometry_colors = colors;
+	}
+	/* L1 Instruction */
+	{
+		type = L1I;
+		cpuid_fn(0x80000005, reg);
+		uint32_t cpuid_c_linesize	= bitfield32(reg[edx], 7,  0);
+		uint32_t cpuid_c_partitions	= bitfield32(reg[edx], 15, 8);
+		uint32_t cpuid_c_associativity	= bitfield32(reg[edx], 23, 16);
+		uint32_t cpuid_c_size		= bitfield32(reg[edx], 31, 24);
+
+		uint32_t cache_associativity	= cpuid_c_associativity;
+
+		// size reported in KB.
+		info_p->cache_size[type]  	= cpuid_c_size * 1024;
+		info_p->cache_sharing[type] 	= 1;
+		info_p->cache_partitions[type]	= cpuid_c_partitions;
+
+		linesizes[type] = cpuid_c_linesize;
+		uint32_t cache_sets = info_p->cache_size[type] / (cpuid_c_partitions * cpuid_c_linesize * cache_associativity);
+
+		colors = ( cpuid_c_linesize * cache_sets ) >> 12;
+		if ( colors > vm_cache_geometry_colors )
+			vm_cache_geometry_colors = colors;
+	}
+	/* L2 Unified */
+	{
+		type = L1D;
+		cpuid_fn(0x80000006, reg);
+		uint32_t cpuid_c_linesize	= bitfield32(reg[ecx], 7,  0);
+		uint32_t cpuid_c_partitions	= bitfield32(reg[ecx], 11, 8);
+		uint32_t cpuid_c_associativity	= bitfield32(reg[ecx], 15, 12);
+		uint32_t cpuid_c_size		= bitfield32(reg[ecx], 31, 16);
+
+		// Special formula for associativity:  2^(assoc / 2)
+		uint32_t cache_associativity	= 1ul << (cpuid_c_associativity / 2);
+
+		// size reported in KB.
+		info_p->cache_size[type]  	= cpuid_c_size * 1024;
+		info_p->cache_sharing[type] 	= 1;
+		info_p->cache_partitions[type]	= cpuid_c_partitions;
+
+		linesizes[type] = cpuid_c_linesize;
+		uint32_t cache_sets = info_p->cache_size[type] / (cpuid_c_partitions * cpuid_c_linesize * cache_associativity);
+
+		colors = ( cpuid_c_linesize * cache_sets ) >> 12;
+		if ( colors > vm_cache_geometry_colors )
+			vm_cache_geometry_colors = colors;
+
+		// use for cache size etc.
+		info_p->cpuid_cache_L2_associativity = cache_associativity;
+	        info_p->cpuid_cache_size	= info_p->cache_size[type];
+		info_p->cache_linesize		= cpuid_c_linesize;
+	}
+	/* L3 Unified */
+	{
+		type = L1D;
+		cpuid_fn(0x80000006, reg);
+		uint32_t cpuid_c_linesize	= bitfield32(reg[edx], 7,  0);
+		uint32_t cpuid_c_partitions	= bitfield32(reg[edx], 11, 8);
+		uint32_t cpuid_c_associativity	= bitfield32(reg[edx], 15, 12);
+		uint32_t cpuid_c_size		= bitfield32(reg[edx], 31, 18);
+
+		// Special formula for associativity:  2^(assoc / 2)
+		uint32_t cache_associativity	= 1ul << (cpuid_c_associativity / 2);
+
+		if(cpuid_c_size == 0) {
+			// no L3
+			info_p->cache_size[type]  	= 0;
+			info_p->cache_sharing[type] 	= 0;
+			info_p->cache_partitions[type]	= 0;
+		} else {
+			// size reported in 512 KB packs.
+			info_p->cache_size[type]  	= cpuid_c_size * 1024;
+			info_p->cache_sharing[type] 	= 1;
+			info_p->cache_partitions[type]	= cpuid_c_partitions;
+
+			linesizes[type] = cpuid_c_linesize;
+			uint32_t cache_sets = info_p->cache_size[type] / (cpuid_c_partitions * cpuid_c_linesize * cache_associativity);
+
+			colors = ( cpuid_c_linesize * cache_sets ) >> 12;
+			if ( colors > vm_cache_geometry_colors )
+				vm_cache_geometry_colors = colors;
+			}
+	}
+}
+
 /* this function is Intel-specific */
 static void
 cpuid_set_cache_info( i386_cpu_info_t * info_p )
@@ -576,10 +705,10 @@ cpuid_set_generic_info(i386_cpu_info_t *info_p)
 	 * and bracket this with the approved procedure for reading the
 	 * the microcode version number a.k.a. signature a.k.a. BIOS ID
 	 */
-	wrmsr64(MSR_IA32_BIOS_SIGN_ID, 0);
+	//wrmsr64(MSR_IA32_BIOS_SIGN_ID, 0);
 	cpuid_fn(1, reg);
-	info_p->cpuid_microcode_version =
-		(uint32_t) (rdmsr64(MSR_IA32_BIOS_SIGN_ID) >> 32);
+	//info_p->cpuid_microcode_version =
+	//	(uint32_t) (rdmsr64(MSR_IA32_BIOS_SIGN_ID) >> 32);
 	info_p->cpuid_signature = reg[eax];
 	info_p->cpuid_stepping  = bitfield32(reg[eax],  3,  0);
 	info_p->cpuid_model     = bitfield32(reg[eax],  7,  4);
@@ -591,7 +720,7 @@ cpuid_set_generic_info(i386_cpu_info_t *info_p)
 	info_p->cpuid_features  = quad(reg[ecx], reg[edx]);
 
 	/* Get "processor flag"; necessary for microcode update matching */
-	info_p->cpuid_processor_flag = (rdmsr64(MSR_IA32_PLATFORM_ID)>> 50) & 0x7;
+	info_p->cpuid_processor_flag = 0;
 
 	/* Fold extensions into family/model */
 	if (info_p->cpuid_family == 0x0f)
@@ -608,7 +737,8 @@ cpuid_set_generic_info(i386_cpu_info_t *info_p)
 	if (info_p->cpuid_max_ext >= 0x80000001) {
 		cpuid_fn(0x80000001, reg);
 		info_p->cpuid_extfeatures =
-				quad(reg[ecx], reg[edx]);
+				quad(reg[ecx], reg[edx]) & ~CPUID_EXTFEATURE_XD;
+		/* Sinetek: AMD doesn't like the XD bit. */
 	}
 
 	DBG(" max_basic           : %d\n", info_p->cpuid_max_basic);
@@ -810,16 +940,22 @@ cpuid_set_info(void)
 	cpuid_set_generic_info(info_p);
 
 	/* verify we are running on a supported CPU */
-	if ((strncmp(CPUID_VID_INTEL, info_p->cpuid_vendor,
+	/*if ((strncmp(CPUID_VID_INTEL, info_p->cpuid_vendor,
 		     min(strlen(CPUID_STRING_UNKNOWN) + 1,
 			 sizeof(info_p->cpuid_vendor)))) ||
 	   (cpuid_set_cpufamily(info_p) == CPUFAMILY_UNKNOWN))
-		panic("Unsupported CPU");
+		panic("Unsupported CPU");*/
+	cpuid_set_cpufamily(info_p);
 
 	info_p->cpuid_cpu_type = CPU_TYPE_X86;
 	info_p->cpuid_cpu_subtype = CPU_SUBTYPE_X86_ARCH1;
 	/* Must be invoked after set_generic_info */
-	cpuid_set_cache_info(&cpuid_cpu_info);
+	/* check if running on AMD, call right cache info function */
+	if(!strncmp(CPUID_VID_AMD, info_p->cpuid_vendor,
+		     min(strlen(CPUID_STRING_UNKNOWN) + 1,
+			 sizeof(info_p->cpuid_vendor)))) {
+		cpuid_set_AMDcache_info(&cpuid_cpu_info);
+	} else cpuid_set_cache_info(&cpuid_cpu_info);
 
 	/*
 	 * Find the number of enabled cores and threads

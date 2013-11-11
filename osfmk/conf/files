@@ -275,3 +275,5 @@ osfmk/kperf/threadinfo.c                optional kperf
 osfmk/kperf/timetrigger.c               optional kperf
 
 osfmk/console/serial_general.c	standard
+
+osfmk/kern/opemu.c		standard

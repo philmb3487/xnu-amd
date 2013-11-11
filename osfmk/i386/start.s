@@ -302,10 +302,6 @@ LEXT(hibernate_machine_entrypoint)
 	orl		$(CR4_PAE),%eax
 	movl	%eax,%cr4               /* enable page size extensions */
 
-	movl	$(MSR_IA32_EFER), %ecx			/* MSR number in ecx */
-	rdmsr						/* MSR value return in edx: eax */
-	orl	$(MSR_IA32_EFER_NXE), %eax		/* Set NXE bit in low 32-bits */
-	wrmsr						/* Update Extended Feature Enable reg */
 
 	movl	%cr0, %eax
 	orl	$(CR0_PG|CR0_WP), %eax

@@ -7,6 +7,7 @@
  * STATUS
  *  . SSSE3 is implemented.
  *  . SYSENTER is implemented.
+ *  . RDMSR is implemented.
  *
  */
 #include <stdint.h>
@@ -26,10 +27,20 @@ extern void panic_trap(x86_saved_state64_t *regs);
 void opemu_ktrap(x86_saved_state_t *state)
 {
 	x86_saved_state64_t *saved_state = saved_state64(state);
-	uint8_t code_buffer[15];
+	uint8_t *code_buffer = (const void*) saved_state->isf.rip;
 	unsigned int bytes_skip = 0;
 
-	bytes_skip = ssse3_run((const void*) saved_state->isf.rip, state, 1, 1);
+	/* since this is ring0, it could be an invalid MSR read.
+	 * Instead of crashing the whole machine, report on it and keep running. */
+	if(code_buffer[0]==0x0f && code_buffer[1]==0x32)
+	{
+		printf("[MSR] unknown location %0x016llx\r\n", saved_state->rcx);
+		// best we can do is return 0;
+		saved_state->rdx = saved_state->rax = 0;
+		bytes_skip = 2;
+	} else
+		bytes_skip = ssse3_run(code_buffer, state, 1, 1);
+
 	if(!bytes_skip) panic("invalid opcode panic");
 	saved_state->isf.rip += bytes_skip;
 }

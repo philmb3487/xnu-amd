@@ -215,6 +215,7 @@ commpage_init_cpu_capabilities( void )
 	 ** On Mountain Lion, kHasSSE4_2 provides vanilla SSE2 routines.
 	 **/
 	bits |= kHasSSE4_2;
+
 	switch (cpu_info.vector_unit) {
 		case 9:
 			bits |= kHasAVX1_0;
@@ -226,10 +227,10 @@ commpage_init_cpu_capabilities( void )
 			bits |= kHasSSE4_1;
 			/* fall thru */
 		case 6:
-			bits |= kHasSupplementalSSE3;
+			bits |= kHasSupplementalSSE3 | kHasSSE3;
 			/* fall thru */
 		case 5:
-			bits |= kHasSSE3;
+			//bits |= kHasSSE3;
 			/* fall thru */
 		case 4:
 			bits |= kHasSSE2;

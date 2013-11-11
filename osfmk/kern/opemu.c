@@ -57,7 +57,7 @@ void opemu_utrap(x86_saved_state_t *state)
 		regs = saved_state64(state);
 		copyin(regs->isf.rip, (char*) code_buffer, 15);
 
-		//bytes_skip = ssse3_run(code_buffer, state, longmode, 0);
+		bytes_skip = ssse3_run(code_buffer, state, longmode, 0);
 		regs->isf.rip += bytes_skip;
 		if(!bytes_skip) {
 			print_bytes(regs->isf.rip, 16);
@@ -79,7 +79,7 @@ void opemu_utrap(x86_saved_state_t *state)
 			/*** NOTREACHED ***/
 		}
 
-		//bytes_skip = ssse3_run(code_buffer, state, longmode, 0);
+		bytes_skip = ssse3_run(code_buffer, state, longmode, 0);
 		regs->eip += bytes_skip;
 		if(!bytes_skip) {
 			print_bytes(regs->eip, 16);

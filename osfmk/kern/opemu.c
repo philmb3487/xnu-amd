@@ -258,9 +258,7 @@ int fetchoperands(uint8_t *ModRM, unsigned int hsrc, unsigned int hdst, void *sr
 		}
 
 		if((mod == 0) && (num_src == 5)) {
-			// special case, RIP-relative dword displacement
-			// TODO fix
-			panic("no rip yet");
+			// RIP-relative dword displacement
 			address = r64->isf.rip + *((int32_t*)&ModRM[consumed]);
 			consumed += 4;			
 		} if(mod == 1) {

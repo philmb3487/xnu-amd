@@ -717,7 +717,8 @@ cpuid_set_generic_info(i386_cpu_info_t *info_p)
 	info_p->cpuid_extmodel  = bitfield32(reg[eax], 19, 16);
 	info_p->cpuid_extfamily = bitfield32(reg[eax], 27, 20);
 	info_p->cpuid_brand     = bitfield32(reg[ebx],  7,  0);
-	info_p->cpuid_features  = quad(reg[ecx], reg[edx]);
+	/** Sinetek: AMD does not like the way the PAT (Page Attribute Table) is set up. **/
+	info_p->cpuid_features  = quad(reg[ecx], reg[edx]) & ~CPUID_FEATURE_PAT;
 
 	/* Get "processor flag"; necessary for microcode update matching */
 	info_p->cpuid_processor_flag = 0;

@@ -726,6 +726,11 @@ kernel_trap(
 FALL_THROUGH:
 #endif /* CONFIG_DTRACE */
 
+	    case T_INVALID_OPCODE:
+		/* Sinetek: we'll handle this. */
+		opemu_ktrap(saved_state);
+		return;
+
 	    case T_GENERAL_PROTECTION:
 		/*
 		 * If there is a failure recovery address
@@ -1059,7 +1064,7 @@ user_trap(
 
 	    case T_INVALID_OPCODE:
 		/* Sinetek: we'll handle this. */
-		opemu_trap(saved_state);
+		opemu_utrap(saved_state);
 
 		exc = EXC_BAD_INSTRUCTION;
 		code = EXC_I386_INVOP;

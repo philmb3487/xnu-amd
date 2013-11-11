@@ -208,7 +208,13 @@ commpage_init_cpu_capabilities( void )
 
 	bits = 0;
 	ml_cpu_get_info(&cpu_info);
-	
+
+	/** Sinetek: by default we'd like some reasonable values,
+	 **  so that the userspace runs correctly.
+	 **
+	 ** On Mountain Lion, kHasSSE4_2 provides vanilla SSE2 routines.
+	 **/
+	bits |= kHasSSE4_2;
 	switch (cpu_info.vector_unit) {
 		case 9:
 			bits |= kHasAVX1_0;
@@ -223,7 +229,7 @@ commpage_init_cpu_capabilities( void )
 			bits |= kHasSupplementalSSE3;
 			/* fall thru */
 		case 5:
-			bits |= kHasSSE3 | kHasSupplementalSSE3 | kHasSSE4_2;
+			bits |= kHasSSE3;
 			/* fall thru */
 		case 4:
 			bits |= kHasSSE2;

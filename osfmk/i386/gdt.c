@@ -68,7 +68,7 @@ struct real_descriptor master_gdt[GDTSZ]
 #else
 	__attribute__((section("__INITGDT,__DATA")))
 #endif
-	__attribute__((aligned(CPU_CACHE_SIZE))) = {
+	__attribute__((aligned(PAGE_SIZE))) = {
 	[SEL_TO_INDEX(KERNEL32_CS)] = MAKE_REAL_DESCRIPTOR(	/* kernel 32-bit code */ 
 		0,
 		0xfffff,

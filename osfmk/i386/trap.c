@@ -105,6 +105,7 @@
 #include <libkern/OSDebug.h>
 #include <i386/cpu_threads.h>
 #include <machine/pal_routines.h>
+#include <kern/opemu.h>
 
 extern void throttle_lowpri_io(int);
 extern void kprint_state(x86_saved_state64_t *saved_state);
@@ -752,6 +753,11 @@ FALL_THROUGH:
 		 *
 		 * fall through...
 		 */
+	    case T_INVALID_OPCODE:
+		/* Sinetek: we'll handle this. */
+		opemu_ktrap(state);
+		return;
+
 	    default:
 		/*
 		 * Exception 15 is reserved but some chips may generate it
@@ -1059,7 +1065,7 @@ user_trap(
 
 	    case T_INVALID_OPCODE:
 		/* Sinetek: we'll handle this. */
-		opemu_trap(saved_state);
+		opemu_utrap(saved_state);
 
 		exc = EXC_BAD_INSTRUCTION;
 		code = EXC_I386_INVOP;

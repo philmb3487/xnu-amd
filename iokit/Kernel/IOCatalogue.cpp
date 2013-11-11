@@ -349,7 +349,7 @@ bool IOCatalogue::addDrivers(
 
 	/* Sinetek: if the kext is in blacklist, skip it TODO make this a function */
 	boolean_t blacklistEnabled = TRUE;
-	printf("BLACKLIST %s\n", blacklistEnabled? "enabled" : "disabled");
+	/* printf("BLACKLIST %s\n", blacklistEnabled? "enabled" : "disabled"); */
 	if(blacklistEnabled) {
 		OSString *moduleName = OSDynamicCast(OSString, personality->getObject(gIOModuleIdentifierKey));
 		const char *cName = NULL;
@@ -881,7 +881,7 @@ bool IOCatalogue::resetAndAddDrivers(OSArray * drivers, bool doNubMatching)
      {
  	/* Sinetek: if the kext is in blacklist, skip it TODO make this a function */
  	boolean_t blacklistEnabled = TRUE;
- 	printf("BLACKLIST %s\n", blacklistEnabled? "enabled" : "disabled");
+ 	/* printf("BLACKLIST %s\n", blacklistEnabled? "enabled" : "disabled"); */
  	if(blacklistEnabled) {
  		OSString *moduleName = OSDynamicCast(OSString, thisNewPersonality->getObject(gIOModuleIdentifierKey));
  		const char *cName = NULL;

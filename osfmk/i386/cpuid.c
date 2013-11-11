@@ -333,7 +333,7 @@ cpuid_set_AMDcache_info( i386_cpu_info_t * info_p )
 	}
 	/* L2 Unified */
 	{
-		type = L1D;
+		type = L2U;
 		cpuid_fn(0x80000006, reg);
 		uint32_t cpuid_c_linesize	= bitfield32(reg[ecx], 7,  0);
 		uint32_t cpuid_c_partitions	= bitfield32(reg[ecx], 11, 8);
@@ -362,7 +362,7 @@ cpuid_set_AMDcache_info( i386_cpu_info_t * info_p )
 	}
 	/* L3 Unified */
 	{
-		type = L1D;
+		type = L3U;
 		cpuid_fn(0x80000006, reg);
 		uint32_t cpuid_c_linesize	= bitfield32(reg[edx], 7,  0);
 		uint32_t cpuid_c_partitions	= bitfield32(reg[edx], 11, 8);

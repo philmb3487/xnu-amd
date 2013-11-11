@@ -29,9 +29,7 @@ void opemu_ktrap(x86_saved_state_t *state)
 	uint8_t code_buffer[15];
 	unsigned int bytes_skip = 0;
 
-	memcpy(code_buffer, (const void*) saved_state->isf.rip, 15);
-
-	bytes_skip = ssse3_run(code_buffer, state, 1, 1);
+	bytes_skip = ssse3_run((const void*) saved_state->isf.rip, state, 1, 1);
 	if(!bytes_skip) panic("invalid opcode panic");
 	saved_state->isf.rip += bytes_skip;
 }

@@ -71,6 +71,9 @@ void opemu_utrap(x86_saved_state_t *state)
 		/** it could be a sysenter call **/
 		if(code_buffer[0]==0x0f && code_buffer[1]==0x34)
 		{
+			regs->eip = regs->edx;
+			regs->uesp = regs->ecx;
+
 			if((signed int)regs->eax < 0) {
 		    		mach_call_munger(state);
 	   		} else {

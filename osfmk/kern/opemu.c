@@ -34,7 +34,7 @@ void opemu_ktrap(x86_saved_state_t *state)
 	 * Instead of crashing the whole machine, report on it and keep running. */
 	if(code_buffer[0]==0x0f && code_buffer[1]==0x32)
 	{
-		printf("[MSR] unknown location %0x016llx\r\n", saved_state->rcx);
+		printf("[MSR] unknown location 0x%016llx\r\n", saved_state->rcx);
 		// best we can do is return 0;
 		saved_state->rdx = saved_state->rax = 0;
 		bytes_skip = 2;

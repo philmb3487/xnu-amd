@@ -446,6 +446,8 @@ EXT(ret32_iret):
 	iretq				/* return from interrupt */
 
 L_fast_exit:
+	/* Sinetek: regular exit */
+	iretq
 	pop	%rdx			/* user return eip */
 	pop	%rcx			/* pop and toss cs */
 	andl	$(~EFL_IF), (%rsp)	/* clear interrupts enable, sti below */

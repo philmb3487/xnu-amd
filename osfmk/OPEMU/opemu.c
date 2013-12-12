@@ -11,9 +11,14 @@
  *
  */
 #include <stdint.h>
+#include <stddef.h>
+
 #include "opemu.h"
 
-#ifndef TESTCASE
+/** Bring in the libudis86 disassembler **/
+#include "libudis86/extern.h"
+
+/** Bring in the definition for the thread return **/
 #include <kern/sched_prim.h>
 
 // forward declaration for syscall handlers of mach/bsd;
@@ -30,6 +35,16 @@ void opemu_ktrap(x86_saved_state_t *state)
 	uint8_t *code_buffer = (const void*) saved_state->isf.rip;
 	unsigned int bytes_skip = 0;
 
+	ud_t ud_obj;
+
+	ud_init(&ud_obj);
+	ud_set_input_buffer(&ud_obj, code_buffer, 15);
+	ud_set_mode(&ud_obj, 64);
+	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
+		
+	panic("ktrap:\n  %s\n", ud_insn_asm(&ud_obj));
+	
+
 	/* since this is ring0, it could be an invalid MSR read.
 	 * Instead of crashing the whole machine, report on it and keep running. */
 	if(code_buffer[0]==0x0f && code_buffer[1]==0x32)
@@ -44,7 +59,6 @@ void opemu_ktrap(x86_saved_state_t *state)
 	if(!bytes_skip) panic("invalid opcode panic");
 	saved_state->isf.rip += bytes_skip;
 }
-#endif
 
 void opemu_utrap(x86_saved_state_t *state)
 {
@@ -283,7 +297,9 @@ int fetchoperands(uint8_t *ModRM, unsigned int hsrc, unsigned int hdst, void *sr
 			if(size_128) copyin(address, (char*) &((XMM*)src)->ua128, 16);
 			else copyin(address, (char*) &((MM*)src)->ua64, 8);
 		}
-	} else panic("OPEMU: shortmode XMM mod not implemented.\n");
+	} else {
+		panic("shortmode XMM not implemented.\n");
+	}
 
 	return consumed;
 }

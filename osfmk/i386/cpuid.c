@@ -905,6 +905,7 @@ cpuid_set_cpufamily(i386_cpu_info_t *info_p)
 	if (IsAmdCPU())
 	{
 		cpufamily = CPUFAMILY_INTEL_PENRYN;
+		info_p->cpuid_cpufamily = cpufamily;
 	}
 
 	return cpufamily;

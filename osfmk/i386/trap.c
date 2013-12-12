@@ -107,7 +107,7 @@
 #include <libkern/OSDebug.h>
 #include <i386/cpu_threads.h>
 #include <machine/pal_routines.h>
-#include <kern/opemu.h>
+#include <OPEMU/opemu.h>
 
 extern void throttle_lowpri_io(int);
 extern void kprint_state(x86_saved_state64_t *saved_state);

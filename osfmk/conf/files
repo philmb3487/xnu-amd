@@ -283,5 +283,3 @@ osfmk/kern/kpc_common.c                 optional kpc
 osfmk/console/serial_general.c	standard
 
 osfmk/kern/telemetry.c			optional config_telemetry
-
-osfmk/kern/opemu.c		standard

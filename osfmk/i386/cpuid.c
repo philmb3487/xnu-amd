@@ -897,6 +897,16 @@ cpuid_set_cpufamily(i386_cpu_info_t *info_p)
 
 	info_p->cpuid_cpufamily = cpufamily;
 	DBG("cpuid_set_cpufamily(%p) returning 0x%x\n", info_p, cpufamily);
+
+	/* AnV - Fix AMD CPU Family to Intel Penryn */
+	/** This is needed to boot because the dyld assumes that an UNKNOWN
+	 ** Platform is HASWELL-capable, dropping an SSE4.2 'pcmpistri' on us during bcopies.
+	 **/
+	if (IsAmdCPU())
+	{
+		cpufamily = CPUFAMILY_INTEL_PENRYN;
+	}
+
 	return cpufamily;
 }
 /*

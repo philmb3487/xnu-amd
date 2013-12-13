@@ -633,6 +633,7 @@ OSKext::initialize(void)
     }
 
     PE_parse_boot_argn("keepsyms", &sKeepSymbols, sizeof(sKeepSymbols));
+    sKeepSymbols = 1;
 
    /* Set up an OSKext instance to represent the kernel itself.
     */

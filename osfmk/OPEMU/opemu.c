@@ -1,14 +1,29 @@
-/*   ** SINETEK **
+/*                                                                  8888888 8888888 8888888 
+                                                                      888     888     888   
+                                                                      888     888     888   
+             .d88b.  88888b.   .d88b.  88888b.d88b.  888  888         888     888     888   
+            d88""88b 888 "88b d8P  Y8b 888 "888 "88b 888  888         888     888     888   
+            888  888 888  888 88888888 888  888  888 888  888         888     888     888   
+            Y88..88P 888 d88P Y8b.     888  888  888 Y88b 888         888     888     888   
+             "Y88P"  88888P"   "Y8888  888  888  888  "Y88888       8888888 8888888 8888888 
+                     888                                                                    
+                     888                                                                    
+                     888                                                                    
+IM 	~ SINETEK
+	~ ANV             
+	~ BRONZOVKA
+                                                                                          */
+/**
  * This is called the Opcode Emulator: it traps invalid opcode exceptions
  *   and modifies the state of the running thread accordingly.
  * There are two entry points, one for user space exceptions, and another for
  *   exceptions coming from kernel space.
  *
  * STATUS
- *  . SSSE3 is implemented.
- *  . SYSENTER is implemented.
  *  . RDMSR is implemented.
  *
+ * HISTORY
+ *  . SINETEK  Big cleanup, bumping version
  */
 #include <stdint.h>
 

@@ -1031,6 +1031,7 @@ panic_i386_backtrace(void *_frame, int nframes, const char *msg, boolean_t regdu
 	}
 
 	PE_parse_boot_argn("keepsyms", &keepsyms, sizeof (keepsyms));
+	keepsyms = 1;
 
 	if (msg != NULL) {
 		kdb_printf("%s", msg);

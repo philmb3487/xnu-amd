@@ -16,6 +16,9 @@ struct op {
 		SAVEDSTATE_32,
 	} state_flavor;
 
+	// just another version of the above
+	x86_saved_state_t *state;
+
 	// disassembly object
 	ud_t		*ud_obj;
 };
@@ -35,4 +38,10 @@ void opemu_utrap(x86_saved_state_t *state);
 extern void mach_call_munger(x86_saved_state_t *state);
 extern void unix_syscall(x86_saved_state_t *);
 
+int retrieve_reg(/*const*/ x86_saved_state_t *, const ud_type_t, uint64_t *);
+
+/**
+ * Entry points for the "plugins"
+ */
+extern int op_sse3x_run(const op_t*);
 

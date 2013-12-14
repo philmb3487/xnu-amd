@@ -46,6 +46,9 @@ struct ssse3 {
 
 	// objects
 	const op_t		*op_obj;
+
+	// legacy mmx flag
+	uint8_t 		islegacy;
 };
 typedef struct ssse3 ssse3_t;
 

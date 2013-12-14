@@ -53,11 +53,12 @@ void opemu_ktrap(x86_saved_state_t *state)
 	int error = 0;
 
 	// fill in the opemu object
+	op_obj.state = state;
 	op_obj.state64 = saved_state;
 	op_obj.state_flavor = SAVEDSTATE_64;
 	op_obj.ud_obj = &ud_obj;
 
-	error |= op_sse3x_run(op_obj);
+	error |= op_sse3x_run(&op_obj);
 
 	if (!error) goto cleanexit;
 
@@ -80,4 +81,123 @@ void opemu_utrap(x86_saved_state_t *state)
 {
 }
 
+/**
+ * Retrieve a general purpose value register's value
+ * @param saved_state: the saved state
+ * @param base:  the register type itself
+ * @param where: reg's value will be stored there
+ * @return: zero if the state could be retrieved
+ */
+int retrieve_reg(/*const*/ x86_saved_state_t *state, const ud_type_t base, uint64_t *where)
+{
+	const x86_saved_state64_t *ss64 = saved_state64(state);
+	const x86_saved_state32_t *ss32 = saved_state32(state);
+
+	switch (base) {
+
+	case UD_R_RAX:
+		*where = ss64 -> rax;
+		break;
+
+	case UD_R_RCX:
+		*where = ss64 -> rcx;
+		break;
+
+	case UD_R_RDX:
+		*where = ss64 -> rdx;
+		break;
+
+	case UD_R_RBX:
+		*where = ss64 -> rbx;
+		break;
+
+	case UD_R_RSP:
+		*where = ss64 -> isf.rsp;
+		break;
+
+	case UD_R_RBP:
+		*where = ss64 -> rbp;
+		break;
+
+	case UD_R_RSI:
+		*where = ss64 -> rsi;
+		break;
+
+	case UD_R_RDI:
+		*where = ss64 -> rdi;
+		break;
+
+	case UD_R_R8:
+		*where = ss64 -> r8;
+		break;
+
+	case UD_R_R9:
+		*where = ss64 -> r9;
+		break;
+
+	case UD_R_R10:
+		*where = ss64 -> r10;
+		break;
+
+	case UD_R_R11:
+		*where = ss64 -> r11;
+		break;
+
+	case UD_R_R12:
+		*where = ss64 -> r12;
+		break;
+
+	case UD_R_R13:
+		*where = ss64 -> r13;
+		break;
+
+	case UD_R_R14:
+		*where = ss64 -> r14;
+		break;
+
+	case UD_R_R15:
+		*where = ss64 -> r15;
+		break;
+
+	/* 32 bit general purpose */
+
+	case UD_R_EAX:
+		*where = ss32 -> eax;
+		break;
+
+	case UD_R_ECX:
+		*where = ss32 -> ecx;
+		break;
+
+	case UD_R_EDX:
+		*where = ss32 -> edx;
+		break;
+
+	case UD_R_EBX:
+		*where = ss32 -> ebx;
+		break;
+
+	case UD_R_ESP:
+		*where = ss32 -> uesp;
+		break;
+
+	case UD_R_EBP:
+		*where = ss32 -> ebp;
+		break;
+
+	case UD_R_ESI:
+		*where = ss32 -> esi;
+		break;
+
+	case UD_R_EDI:
+		*where = ss32 -> edi;
+		break;
+
+	default: goto bad;
+
+	}		
+
+good:	return 0;
+bad:	return -1;
+}
 

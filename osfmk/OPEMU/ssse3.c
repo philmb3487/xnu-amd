@@ -1,3 +1,14 @@
+/*
+             .d8888b.   .d8888b.   .d8888b.  8888888888 .d8888b.  
+            d88P  Y88b d88P  Y88b d88P  Y88b 888       d88P  Y88b 
+            Y88b.      Y88b.      Y88b.      888            .d88P 
+             "Y888b.    "Y888b.    "Y888b.   8888888       8888"  
+                "Y88b.     "Y88b.     "Y88b. 888            "Y8b. 
+                  "888       "888       "888 888       888    888 
+            Y88b  d88P Y88b  d88P Y88b  d88P 888       Y88b  d88P 
+             "Y8888P"   "Y8888P"   "Y8888P"  8888888888 "Y8888P"  
+*/
+
 #include "opemu.h"
 #include "ssse3_priv.h"
 
@@ -15,7 +26,7 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 		_store_xmm (ssse3_obj->udo_src->base - UD_R_XMM0, (void*) &ssse3_obj->src.uint128);
 	} else {
 		// m128 load
-		uint64_t disp;
+		int64_t disp;
 		uint8_t disp_size = ssse3_obj->udo_src->offset;
 		uint64_t address;
 		
@@ -25,7 +36,8 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 		if (retrieve_reg (ssse3_obj->op_obj->state,
 			ssse3_obj->udo_src->base, &address) != 0) goto bad;
 
-		ssse3_obj->src.uint128 = address;
+		// TODO this is good for kernel only
+		ssse3_obj->src.uint128 = * (__uint128_t*) (address + disp);
 	}
 
 good:

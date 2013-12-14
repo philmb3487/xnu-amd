@@ -9,6 +9,7 @@
  **/
 
 #include "opemu.c"
+#include "sse3x.c"
 
 /*** bring in libudis86 static ***/
 

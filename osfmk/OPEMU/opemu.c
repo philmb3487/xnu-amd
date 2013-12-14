@@ -9,9 +9,9 @@
                      888                                                                    
                      888                                                                    
                      888                                                                    
-IM 	~ SINETEK
-	~ ANV             
-	~ BRONZOVKA
+IM      ~ SINETEK                                                                           
+        ~ ANV                                                                               
+        ~ BRONZOVKA                                                                         
                                                                                           */
 /**
  * This is called the Opcode Emulator: it traps invalid opcode exceptions

@@ -13,7 +13,6 @@
 #include <stdint.h>
 
 #include "opemu.h"
-#include "libudis86/extern.h"
 
 /*
  * The KTRAP is only ever called from within the kernel,
@@ -27,15 +26,14 @@ void opemu_ktrap(x86_saved_state_t *state)
 	uint8_t bytes_skip = 0;
 
 	ud_t ud_obj;		// disassembler object
+	op_t op_obj;
 	
-	// the ud has an internal buffer. TODO might wanna check tho.
-	// TODO set arch to Intel
+
 	ud_init(&ud_obj);
 	ud_set_input_buffer(&ud_obj, code_buffer, 15);	// TODO dangerous
 	ud_set_mode(&ud_obj, 64);
 	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
-	
-	// 
+	ud_set_vendor(&ud_obj, UD_VENDOR_ANY);
 
 	bytes_skip = ud_disassemble(&ud_obj);
 	if ( bytes_skip == 0 ) goto bad;
@@ -54,13 +52,12 @@ void opemu_ktrap(x86_saved_state_t *state)
 
 	int error = 0;
 
-	/* we'll need a saved state */
-	op_saved_state_t ss_obj = {
-		.state64 = saved_state,
-		.type = SAVEDSTATE_64,
-	};
+	// fill in the opemu object
+	op_obj.state64 = saved_state;
+	op_obj.state_flavor = SAVEDSTATE_64;
+	op_obj.ud_obj = &ud_obj;
 
-	//error |= op_sse3x_run(&ud_obj, &ss_obj);
+	error |= op_sse3x_run(op_obj);
 
 	if (!error) goto cleanexit;
 

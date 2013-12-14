@@ -11,27 +11,9 @@
  *
  */
 #include <stdint.h>
-#include <stddef.h>
 
 #include "opemu.h"
-#include "sse.h"
-
-/** Bring in the libudis86 disassembler **/
 #include "libudis86/extern.h"
-
-/** Bring in the definition for the thread return **/
-#include <kern/sched_prim.h>
-
-// forward declaration for syscall handlers of mach/bsd;
-extern void mach_call_munger(x86_saved_state_t *state);
-extern void unix_syscall(x86_saved_state_t *);
-
-// forward declaration of panic handler for kernel traps;
-extern void panic_trap(x86_saved_state64_t *regs);
-
-/**
- **  OPEMU Implementation
- **/
 
 /*
  * The KTRAP is only ever called from within the kernel,
@@ -75,10 +57,10 @@ void opemu_ktrap(x86_saved_state_t *state)
 	/* we'll need a saved state */
 	op_saved_state_t ss_obj = {
 		.state64 = saved_state,
-		.type = TYPE_64
+		.type = SAVEDSTATE_64,
 	};
 
-	error |= op_sse3x_run(&ud_obj, &ss_obj);
+	//error |= op_sse3x_run(&ud_obj, &ss_obj);
 
 	if (!error) goto cleanexit;
 

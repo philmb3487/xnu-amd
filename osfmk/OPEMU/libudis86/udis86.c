@@ -24,6 +24,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define __UD_STANDALONE__
+
 #include "udint.h"
 #include "extern.h"
 #include "decode.h"

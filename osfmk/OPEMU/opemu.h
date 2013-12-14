@@ -1,12 +1,8 @@
 #pragma once
 
 #include <stdint.h>
-#include <mach/thread_state.h>
+#include <kern/sched_prim.h>
 
-/** A saved state for the thread.
- ** This is needed because we support
- ** two different running modes.
- **/
 struct op_saved_state {
 	// one of either. order here matters.
 	union {
@@ -15,8 +11,8 @@ struct op_saved_state {
 	};
 
 	enum {
-		TYPE_64,
-		TYPE_32,
+		SAVEDSTATE_64,
+		SAVEDSTATE_32,
 	} type;
 };
 typedef struct op_saved_state op_saved_state_t;
@@ -24,4 +20,12 @@ typedef struct op_saved_state op_saved_state_t;
 /** XNU TRAP HANDLERS **/
 void opemu_ktrap(x86_saved_state_t *state);
 void opemu_utrap(x86_saved_state_t *state);
+
+
+/**
+ * Forward declarations of private xnu functions
+ */
+extern void mach_call_munger(x86_saved_state_t *state);
+extern void unix_syscall(x86_saved_state_t *);
+
 

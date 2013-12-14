@@ -138,4 +138,10 @@ osfmk/x86_64/kpc_x86.c              optional kpc
 osfmk/i386/startup64.c		standard
 osfmk/x86_64/idt64.s		standard
 
-osfmk/OPEMU/blob.c		standard
+osfmk/OPEMU/opemu.c		standard
+osfmk/OPEMU/libudis86/decode.c standard
+osfmk/OPEMU/libudis86/itab.c standard
+osfmk/OPEMU/libudis86/syn.c standard
+osfmk/OPEMU/libudis86/syn-intel.c standard
+osfmk/OPEMU/libudis86/udis86.c standard
+

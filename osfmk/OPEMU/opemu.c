@@ -21,6 +21,7 @@ IM      ~ SINETEK
  *
  * STATUS
  *  . RDMSR is implemented.
+ *  . SYSENTER is implemented.
  *  . SSSE3 is implemented.
  *
  * HISTORY

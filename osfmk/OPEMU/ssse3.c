@@ -21,36 +21,45 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 	// TODO legacy mmx
 	if (ssse3_obj->islegacy) goto bad;
 
-	_store_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, (void*) &ssse3_obj->dst.uint128);
-	if (ssse3_obj->udo_src->base == UD_OP_REG) {
-		_store_xmm (ssse3_obj->udo_src->base - UD_R_XMM0, (void*) &ssse3_obj->src.uint128);
+	_store_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, &ssse3_obj->dst.uint128);
+	if (ssse3_obj->udo_src->type == UD_OP_REG) {
+		_store_xmm (ssse3_obj->udo_src->base - UD_R_XMM0, &ssse3_obj->src.uint128);
 	} else {
 		// m128 load
-		int64_t disp;
+		int64_t disp = ssse3_obj->udo_src->lval.sqword;
 		uint8_t disp_size = ssse3_obj->udo_src->offset;
 		uint64_t address;
 		
 		if (ssse3_obj->udo_src->scale) goto bad; // TODO
 
-		disp = ssse3_obj->udo_src->lval.uqword & ((2 ^ (disp_size)) - 1);
 		if (retrieve_reg (ssse3_obj->op_obj->state,
 			ssse3_obj->udo_src->base, &address) != 0) goto bad;
 
-		// TODO this is good for kernel only
-		ssse3_obj->src.uint128 = * (__uint128_t*) (address + disp);
+		address += disp;
+
+		if (ssse3_obj->op_obj->ring0)
+			ssse3_obj->src.uint128 = * ((__uint128_t*) (address));
+		else copyin (address, (char*) &ssse3_obj->src.uint128, 16);
 	}
 
-good:
-	return 0;
-bad:
-	return -1;
+good:	return 0;
+bad:	return -1;
 }
 
 /**
  * Store operands from obj to memory/register.
  * @return: 0 if success
  */
-int ssse3_commit_results(const ssse3_t*);
+int ssse3_commit_results(const ssse3_t *ssse3_obj)
+{
+	// TODO legacy mmx
+	if (ssse3_obj->islegacy) goto bad;
+
+	_load_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, (void*) &ssse3_obj->res.uint128);
+
+good:	return 0;
+bad:	return -1;
+}
 
 
 /**
@@ -62,40 +71,38 @@ int ssse3_commit_results(const ssse3_t*);
  */
 int op_sse3x_run(const op_t *op_obj)
 {
-	LF
-
 	ssse3_t ssse3_obj;
 	ssse3_obj.op_obj = op_obj;
 	const uint32_t mnemonic = ud_insn_mnemonic(ssse3_obj.op_obj->ud_obj);
 	ssse3_func opf;
 
 	switch (mnemonic) {
-//	case UD_Ipsignb:	opf = psignb;
-//	case UD_Ipsignw:	opf = psignw;
-//	case UD_Ipsignd:	opf = psignd;
-//
-//	case UD_Ipabsb:		opf = pabsb;
-//	case UD_Ipabsw:		opf = pabsw;
-//	case UD_Ipabsd:		opf = pabsd;
-//
-//	case UD_Ipalignr:	opf = palignr;
-//
-	case UD_Ipshufb:	opf = pshufb;
-//
-//	case UD_Ipmulhrsw:	opf = pmulhrsw;
-//
-//	case UD_Ipmaddubsw:	opf = pmaddubsw;
-//
-//	case UD_Iphsubw:	opf = phsubw;
-//	case UD_Iphsubd:	opf = phsubd;
-//
-//	case UD_Iphsubsw:	opf = phsubsw;
-//
-//	case UD_Iphaddw:	opf = phaddw;
-//	case UD_Iphaddd:	opf = phaddd;
-//
-//	case UD_Iphaddsw:	opf = phaddsw;
-sse3x_common:
+	case UD_Ipsignb:	opf = psignb;	goto ssse3_common;
+	case UD_Ipsignw:	opf = psignw;	goto ssse3_common;
+	case UD_Ipsignd:	opf = psignd;	goto ssse3_common;
+
+	case UD_Ipabsb:		opf = pabsb;	goto ssse3_common;
+	case UD_Ipabsw:		opf = pabsw;	goto ssse3_common;
+	case UD_Ipabsd:		opf = pabsd;	goto ssse3_common;
+
+	case UD_Ipalignr:	opf = palignr;	goto ssse3_common;
+
+	case UD_Ipshufb:	opf = pshufb;	goto ssse3_common;
+
+	case UD_Ipmulhrsw:	opf = pmulhrsw;	goto ssse3_common;
+
+	case UD_Ipmaddubsw:	opf = pmaddubsw;	goto ssse3_common;
+
+	case UD_Iphsubw:	opf = phsubw;	goto ssse3_common;
+	case UD_Iphsubd:	opf = phsubd;	goto ssse3_common;
+
+	case UD_Iphsubsw:	opf = phsubsw;	goto ssse3_common;
+
+	case UD_Iphaddw:	opf = phaddw;	goto ssse3_common;
+	case UD_Iphaddd:	opf = phaddd;	goto ssse3_common;
+
+	case UD_Iphaddsw:	opf = phaddsw;	goto ssse3_common;
+ssse3_common:
 	
 	ssse3_obj.udo_src = ud_insn_opr (op_obj->ud_obj, 1);
 	ssse3_obj.udo_dst = ud_insn_opr (op_obj->ud_obj, 0);
@@ -118,6 +125,10 @@ sse3x_common:
 
 	opf(&ssse3_obj);
 
+	if (ssse3_commit_results(&ssse3_obj)) goto bad;
+
+	goto good;
+
 	default: goto bad;
 	}
 
@@ -127,20 +138,351 @@ bad:
 	return -1;
 }
 
+#define SATSW(x) ((x > 32767)? 32767 : ((x < -32768)? -32768 : x) )
+
 /**
- *
+ * Negate/zero/preserve
  */
-void pshufb (ssse3_t *this)
+void psignb (ssse3_t *this)
 {
-	LF
+	const int8_t *src = &this->src.int8[0];
+	const int8_t *dst = &this->dst.int8[0];
+	int8_t *res = &this->res.int8[0];
 
-	printf("src: "); print128(this->src.uint128); printf("\n");
-	printf("dst: "); print128(this->dst.uint128); printf("\n");
+	int count = (this->islegacy) ? 8 : 16;
+	for (int i = 0; i < count; ++ i) {
+		if (*src < 0) *res = - *dst;
+		else if (*src == 0) *res = 0;
+		else if (*src > 0) *res = *dst;
 
-	panic();
-
-	for (int i = 0; i < (this->islegacy) ? 8 : 16; ++ i) {
+		++res; ++src; ++dst;
 	}
 }
 
+/**
+ * Negate/zero/preserve
+ */
+void psignw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	int16_t *res = &this->res.int16[0];
+
+	int count = (this->islegacy) ? 4 : 8;
+	for (int i = 0; i < count; ++ i) {
+		if (*src < 0) *res = - *dst;
+		else if (*src == 0) *res = 0;
+		else if (*src > 0) *res = *dst;
+
+		++res; ++src; ++dst;
+	}
+}
+
+/**
+ * Negate/zero/preserve
+ */
+void psignd (ssse3_t *this)
+{
+	const int32_t *src = &this->src.int32[0];
+	const int32_t *dst = &this->dst.int32[0];
+	int32_t *res = &this->res.int32[0];
+
+	int count = (this->islegacy) ? 2 : 4;
+	for (int i = 0; i < count; ++ i) {
+		if (*src < 0) *res = - *dst;
+		else if (*src == 0) *res = 0;
+		else if (*src > 0) *res = *dst;
+
+		++res; ++src; ++dst;
+	}
+}
+
+/**
+ * Absolute value
+ */
+void pabsb (ssse3_t *this)
+{
+	const int8_t *src = &this->src.int8[0];
+	const int8_t *dst = &this->dst.int8[0];
+	uint8_t *res = &this->res.uint8[0];
+
+	int count = (this->islegacy) ? 8 : 16;
+	for (int i = 0; i < count; ++ i) {
+		if (*src < 0) *res = - *src;
+
+		++res; ++src; ++dst;
+	}
+}
+
+/**
+ * Absolute value
+ */
+void pabsw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	uint16_t *res = &this->res.uint16[0];
+
+	int count = (this->islegacy) ? 4 : 8;
+	for (int i = 0; i < count; ++ i) {
+		if (*src < 0) *res = - *src;
+
+		++res; ++src; ++dst;
+	}
+}
+
+/**
+ * Absolute value
+ */
+void pabsd (ssse3_t *this)
+{
+	const int32_t *src = &this->src.int32[0];
+	const int32_t *dst = &this->dst.int32[0];
+	uint32_t *res = &this->res.uint32[0];
+
+	int count = (this->islegacy) ? 2 : 4;
+	for (int i = 0; i < count; ++ i) {
+		if (*src < 0) *res = - *src;
+
+		++res; ++src; ++dst;
+	}
+}
+
+/**
+ * Concatenate and shift
+ */ 
+void palignr (ssse3_t *this)
+{
+	uint8_t imm = this->udo_imm->lval.ubyte;
+
+	if (this->islegacy) {
+		__uint128_t temp1 = this->dst.uint64[0];
+		temp1 <<= 64;
+		temp1 |= this->src.uint64[0];
+		temp1 >>= (imm * 8);
+		this->res.uint128 = temp1;
+	} else {
+		__uint128_t temp1[2];
+		uint8_t *shiftp; // that type matters for pointer arithmetic
+		temp1[0] = this->src.uint128;
+		temp1[1] = this->dst.uint128;
+		shiftp = (uint8_t*) &temp1[0];
+		shiftp += imm;
+		this->res.uint128 = * ((__uint128_t*) shiftp);
+	}
+}
+
+/**
+ * Shuffle Bytes
+ */
+void pshufb (ssse3_t *this)
+{
+	const uint8_t *src = &this->src.uint8[0];
+	uint8_t *res = &this->res.uint8[0];
+
+	int count = (this->islegacy) ? 8 : 16;
+	uint8_t mask = (this->islegacy) ? 0b0111 : 0b1111;
+	for (int i = 0; i < count; ++ i) {
+		if (*src & 0x80) *res = 0;
+		else *res = this->dst.uint8[ *src & mask ];
+
+		++res; ++src;
+	}
+}
+
+/**
+ * Multiply high with round and scale
+ */
+void pmulhrsw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	uint16_t *res = &this->res.uint16[0];
+
+	int count = (this->islegacy) ? 4 : 8;
+	for (int i = 0; i < count; ++i) {
+		uint32_t temp1 = (*dst) * (*src);
+		temp1 >>= 14;
+		temp1++;
+		*res = temp1;
+
+		++res; ++src; ++dst;
+	}
+}
+
+/**
+ * Multiply and add
+ */
+void pmaddubsw (ssse3_t *this)
+{
+	const int8_t *src = &this->src.int8[0];
+	const uint8_t *dst = &this->dst.uint8[0];
+	uint16_t *res = &this->res.uint16[0];
+
+	int count = (this->islegacy) ? 4 : 8;
+	for (int i = 0; i < count; ++i) {
+		int16_t temp1 = (src[0] * dst[0]) + (src[1] * dst[1]);
+		*res = SATSW(temp1);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}	
+}
+
+/**
+ * Horizontal subtract
+ */
+void phsubw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	int16_t *res = &this->res.int16[0];
+
+	int count = (this->islegacy) ? 2 : 4;
+	for (int i = 0; i < count; ++ i) {
+		*res = (dst[0]) - (dst[1]);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+	for (int i = 0; i < count; ++ i) {
+		*res = (src[0]) - (src[1]);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+}
+
+/**
+ * Horizontal subtract
+ */
+void phsubd (ssse3_t *this)
+{
+	const int32_t *src = &this->src.int32[0];
+	const int32_t *dst = &this->dst.int32[0];
+	int32_t *res = &this->res.int32[0];
+
+	int count = (this->islegacy) ? 1 : 2;
+	for (int i = 0; i < count; ++ i) {
+		*res = (dst[0]) - (dst[1]);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+	for (int i = 0; i < count; ++ i) {
+		*res = (src[0]) - (src[1]);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+}
+
+/**
+ * Horizontal subtract and saturate
+ */
+void phsubsw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	int16_t *res = &this->res.int16[0];
+
+	int count = (this->islegacy) ? 2 : 4;
+	for (int i = 0; i < count; ++ i) {
+		*res = SATSW((dst[0]) - (dst[1]));
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+	for (int i = 0; i < count; ++ i) {
+		*res = SATSW((src[0]) - (src[1]));
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+}
+
+/**
+ * Horizontal add
+ */
+void phaddw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	int16_t *res = &this->res.int16[0];
+
+	int count = (this->islegacy) ? 2 : 4;
+	for (int i = 0; i < count; ++ i) {
+		*res = dst[0] + dst[1];
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+	for (int i = 0; i < count; ++ i) {
+		*res = src[0] + src[1];
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+}
+
+/**
+ * Horizontal add
+ */
+void phaddd (ssse3_t *this)
+{
+	const int32_t *src = &this->src.int32[0];
+	const int32_t *dst = &this->dst.int32[0];
+	int32_t *res = &this->res.int32[0];
+
+	int count = (this->islegacy) ? 1 : 2;
+	for (int i = 0; i < count; ++ i) {
+		*res = dst[0] + dst[1];
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+	for (int i = 0; i < count; ++ i) {
+		*res = src[0] + src[1];
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+}
+
+/**
+ * Horizontal add and saturate
+ */
+void phaddsw (ssse3_t *this)
+{
+	const int16_t *src = &this->src.int16[0];
+	const int16_t *dst = &this->dst.int16[0];
+	int16_t *res = &this->res.int16[0];
+
+	int count = (this->islegacy) ? 2 : 4;
+	for (int i = 0; i < count; ++ i) {
+		*res = SATSW(dst[0] + dst[1]);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+	for (int i = 0; i < count; ++ i) {
+		*res = SATSW(src[0] + src[1]);
+
+		++res;
+		src += 2;
+		dst += 2;
+	}
+}
 

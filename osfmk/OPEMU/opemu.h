@@ -21,6 +21,9 @@ struct op {
 
 	// disassembly object
 	ud_t		*ud_obj;
+
+	// boolean flag
+	uint8_t		ring0;
 };
 typedef struct op op_t;
 
@@ -29,7 +32,7 @@ typedef struct op op_t;
  * @param state: xnu's trap.c saved thread state
  */
 void opemu_ktrap(x86_saved_state_t *state);
-void opemu_utrap(x86_saved_state_t *state);
+void opemu_utrap(x86_saved_state_t *state) __attribute__((noreturn));
 
 
 /**

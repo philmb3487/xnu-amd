@@ -27,10 +27,9 @@ typedef union sse_reg sse_reg_t;
 
 /**
  * Print said register to screen. Useful for debugging
+ * @param  uint128
  */
 #define print128(x)	printf("0x%016llx%016llx", ((uint64_t*)(&(x)))[1], ((uint64_t*)(&(x)))[0] );
-
-
 
 /**
  * ssse3 object
@@ -60,78 +59,82 @@ typedef struct ssse3 ssse3_t;
 typedef void (*ssse3_func)(ssse3_t*);
 
 
-#define movdqu_template(n, where)					\
+#define storedqu_template(n, where)					\
 	do {								\
 	asm __volatile__ ("movdqu %%xmm" #n ", %0" : "=m" (*(where)));	\
-	} while (0); break;
+	} while (0);
+
+#define loaddqu_template(n, where)					\
+	do {								\
+	asm __volatile__ ("movdqu %0, %%xmm" #n :: "m" (*(where)));	\
+	} while (0);
 
 /**
  * Store xmm register somewhere in memory
  */
-void _store_xmm (const uint8_t n, uint8_t *where)
+inline void _store_xmm (const uint8_t n, __uint128_t *where)
 {
 	switch (n) {
-case 0:  movdqu_template(0, where);
-case 1:  movdqu_template(1, where);
-case 2:  movdqu_template(2, where);
-case 3:  movdqu_template(3, where);
-case 4:  movdqu_template(4, where);
-case 5:  movdqu_template(5, where);
-case 6:  movdqu_template(6, where);
-case 7:  movdqu_template(7, where);
-case 8:  movdqu_template(8, where);
-case 9:  movdqu_template(9, where);
-case 10: movdqu_template(10, where);
-case 11: movdqu_template(11, where);
-case 12: movdqu_template(12, where);
-case 13: movdqu_template(13, where);
-case 14: movdqu_template(14, where);
-case 15: movdqu_template(15, where);
+case 0:  storedqu_template(0, where); break;
+case 1:  storedqu_template(1, where); break;
+case 2:  storedqu_template(2, where); break;
+case 3:  storedqu_template(3, where); break;
+case 4:  storedqu_template(4, where); break;
+case 5:  storedqu_template(5, where); break;
+case 6:  storedqu_template(6, where); break;
+case 7:  storedqu_template(7, where); break;
+case 8:  storedqu_template(8, where); break;
+case 9:  storedqu_template(9, where); break;
+case 10: storedqu_template(10, where); break;
+case 11: storedqu_template(11, where); break;
+case 12: storedqu_template(12, where); break;
+case 13: storedqu_template(13, where); break;
+case 14: storedqu_template(14, where); break;
+case 15: storedqu_template(15, where); break;
 }}
 
 /**
  * Load xmm register from memory
  */
-void _load_xmm (const uint8_t n, const uint8_t *where)
+inline void _load_xmm (const uint8_t n, const __uint128_t *where)
 {
 	switch (n) {
-case 0:  movdqu_template(0, where);
-case 1:  movdqu_template(1, where);
-case 2:  movdqu_template(2, where);
-case 3:  movdqu_template(3, where);
-case 4:  movdqu_template(4, where);
-case 5:  movdqu_template(5, where);
-case 6:  movdqu_template(6, where);
-case 7:  movdqu_template(7, where);
-case 8:  movdqu_template(8, where);
-case 9:  movdqu_template(9, where);
-case 10: movdqu_template(10, where);
-case 11: movdqu_template(11, where);
-case 12: movdqu_template(12, where);
-case 13: movdqu_template(13, where);
-case 14: movdqu_template(14, where);
-case 15: movdqu_template(15, where);
+case 0:  loaddqu_template(0, where); break;
+case 1:  loaddqu_template(1, where); break;
+case 2:  loaddqu_template(2, where); break;
+case 3:  loaddqu_template(3, where); break;
+case 4:  loaddqu_template(4, where); break;
+case 5:  loaddqu_template(5, where); break;
+case 6:  loaddqu_template(6, where); break;
+case 7:  loaddqu_template(7, where); break;
+case 8:  loaddqu_template(8, where); break;
+case 9:  loaddqu_template(9, where); break;
+case 10: loaddqu_template(10, where); break;
+case 11: loaddqu_template(11, where); break;
+case 12: loaddqu_template(12, where); break;
+case 13: loaddqu_template(13, where); break;
+case 14: loaddqu_template(14, where); break;
+case 15: loaddqu_template(15, where); break;
 }}
 
-int ssse3_grab_operands(ssse3_t*);
-int ssse3_commit_results(const ssse3_t*);
-int op_sse3x_run(const op_t*);
+inline int ssse3_grab_operands(ssse3_t*);
+inline int ssse3_commit_results(const ssse3_t*);
+inline int op_sse3x_run(const op_t*);
 
-void psignb	(ssse3_t*);
-void psignw	(ssse3_t*);
-void psignd	(ssse3_t*);
-void pabsb	(ssse3_t*);
-void pabsw	(ssse3_t*);
-void pabsd	(ssse3_t*);
-void palignr	(ssse3_t*);
-void pshufb	(ssse3_t*);
-void pmulhrsw	(ssse3_t*);
-void pmaddubsw	(ssse3_t*);
-void phsubw	(ssse3_t*);
-void phsubd	(ssse3_t*);
-void phsubsw	(ssse3_t*);
-void phaddw	(ssse3_t*);
-void phaddd	(ssse3_t*);
-void phaddsw	(ssse3_t*);
-
+inline void psignb	(ssse3_t*);
+inline void psignw	(ssse3_t*);
+inline void psignd	(ssse3_t*);
+inline void pabsb	(ssse3_t*);
+inline void pabsw	(ssse3_t*);
+inline void pabsd	(ssse3_t*);
+inline void palignr	(ssse3_t*);
+inline void pshufb	(ssse3_t*);
+inline void pmulhrsw	(ssse3_t*);
+inline void pmaddubsw	(ssse3_t*);
+inline void phsubw	(ssse3_t*);
+inline void phsubd	(ssse3_t*);
+inline void phsubsw	(ssse3_t*);
+inline void phaddw	(ssse3_t*);
+inline void phaddd	(ssse3_t*);
+inline void phaddsw	(ssse3_t*);
 

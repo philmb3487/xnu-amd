@@ -21,11 +21,13 @@ IM      ~ SINETEK
  *
  * STATUS
  *  . RDMSR is implemented.
+ *  . SSSE3 is implemented.
  *
  * HISTORY
  *  . SINETEK  Big cleanup, bumping version
  */
 #include <stdint.h>
+#include <i386/trap.h>
 
 #include "opemu.h"
 
@@ -37,15 +39,14 @@ IM      ~ SINETEK
 void opemu_ktrap(x86_saved_state_t *state)
 {
 	x86_saved_state64_t *saved_state = saved_state64(state);
-	const uint8_t *code_buffer = (const uint8_t*) saved_state->isf.rip;
+	const uint8_t *code_stream = (const uint8_t*) saved_state->isf.rip;
 	uint8_t bytes_skip = 0;
 
 	ud_t ud_obj;		// disassembler object
 	op_t op_obj;
 	
-
 	ud_init(&ud_obj);
-	ud_set_input_buffer(&ud_obj, code_buffer, 15);	// TODO dangerous
+	ud_set_input_buffer(&ud_obj, code_stream, 15);	// TODO dangerous
 	ud_set_mode(&ud_obj, 64);
 	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
 	ud_set_vendor(&ud_obj, UD_VENDOR_ANY);
@@ -72,6 +73,7 @@ void opemu_ktrap(x86_saved_state_t *state)
 	op_obj.state64 = saved_state;
 	op_obj.state_flavor = SAVEDSTATE_64;
 	op_obj.ud_obj = &ud_obj;
+	op_obj.ring0 = 1;
 
 	error |= op_sse3x_run(&op_obj);
 
@@ -92,8 +94,84 @@ cleanexit:
 	saved_state->isf.rip += bytes_skip;
 }
 
+/**
+ * Run the opcode emulator on a userspace thread.
+ */
 void opemu_utrap(x86_saved_state_t *state)
 {
+	uint8_t islongmode = is_saved_state64(state);
+	const uint8_t *code_stream;
+	uint8_t bytes_skip = 0;
+
+	ud_t ud_obj;		// disassembler object
+	op_t op_obj;
+
+	if (islongmode) {
+		code_stream = (const uint8_t*) state->ss_64.isf.rip;
+	} else {
+		uint64_t ip = state->ss_32.eip; // prevent warning
+		code_stream = (const uint8_t*) ip;
+	}
+
+	ud_init(&ud_obj);
+	ud_set_input_buffer(&ud_obj, code_stream, 15);	// TODO dangerous
+	ud_set_mode(&ud_obj, 64);
+	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
+	ud_set_vendor(&ud_obj, UD_VENDOR_ANY);
+
+	bytes_skip = ud_disassemble(&ud_obj);
+	if ( bytes_skip == 0 ) goto bad;
+	const uint32_t mnemonic = ud_insn_mnemonic(&ud_obj);
+
+	int error = 0;
+
+	/* It could be a sysenter instruction, which translates to a system call
+	 * (both mach and bsd calls)
+	 * To my knowledge all x86_64 platforms support it in long mode.
+	 */
+	if (mnemonic == UD_Isysenter) {
+		saved_state32(state)->eip = saved_state32(state)->edx;
+		saved_state32(state)->uesp = saved_state32(state)->ecx;
+
+		if ((signed) saved_state32(state)->eax < 0) {
+			mach_call_munger(state);
+		} else {
+			unix_syscall(state);
+		}
+		/** NOTREACHED **/
+		__builtin_unreachable(); // clang extension
+	}
+	
+	// fill in the opemu object
+	op_obj.state = state;
+	op_obj.state64 = saved_state64(state);
+	op_obj.state32 = saved_state32(state);
+	op_obj.state_flavor = (islongmode) ? SAVEDSTATE_64 : SAVEDSTATE_32;
+	op_obj.ud_obj = &ud_obj;
+	op_obj.ring0 = 0;
+
+	error |= op_sse3x_run(&op_obj);
+
+	if (!error) goto cleanexit;
+
+	/** fallthru **/
+bad:
+	{
+		/* Well, now go in and get the asm text at least.. */
+		const char *instruction_asm;
+		instruction_asm = ud_insn_asm(&ud_obj);
+
+		printf ( "OPEMU:  %s\n", instruction_asm) ;
+		i386_exception (EXC_BAD_INSTRUCTION, EXC_I386_INVOP, 0);
+	}
+
+cleanexit:
+	if (islongmode) saved_state64(state)->isf.rip += bytes_skip;
+	else saved_state32(state)->eip += bytes_skip;
+
+	thread_exception_return();
+	/** NOTREACHED **/
+	__builtin_unreachable(); // clang extension
 }
 
 /**
@@ -109,6 +187,10 @@ int retrieve_reg(/*const*/ x86_saved_state_t *state, const ud_type_t base, uint6
 	const x86_saved_state32_t *ss32 = saved_state32(state);
 
 	switch (base) {
+
+	// TODO what if 32?
+	case UD_R_RIP:
+		*where = ss64 -> isf.rip;
 
 	case UD_R_RAX:
 		*where = ss64 -> rax;

@@ -18,28 +18,48 @@
  */
 int ssse3_grab_operands(ssse3_t *ssse3_obj)
 {
-	// TODO legacy mmx
-	if (ssse3_obj->islegacy) goto bad;
+	if (ssse3_obj->islegacy) {
+		_store_mmx (ssse3_obj->udo_dst->base - UD_R_MM0, &ssse3_obj->dst.uint64[0]);
+		if (ssse3_obj->udo_src->type == UD_OP_REG) {
+			_store_mmx (ssse3_obj->udo_src->base - UD_R_MM0, &ssse3_obj->src.uint64[0]);
+		} else {
+			// m64 load
+			int64_t disp = ssse3_obj->udo_src->lval.sqword;
+			uint8_t disp_size = ssse3_obj->udo_src->offset;
+			uint64_t address;
+			
+			if (ssse3_obj->udo_src->scale) goto bad; // TODO
 
-	_store_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, &ssse3_obj->dst.uint128);
-	if (ssse3_obj->udo_src->type == UD_OP_REG) {
-		_store_xmm (ssse3_obj->udo_src->base - UD_R_XMM0, &ssse3_obj->src.uint128);
+			if (retrieve_reg (ssse3_obj->op_obj->state,
+				ssse3_obj->udo_src->base, &address) != 0) goto bad;
+
+			address += disp;
+
+			if (ssse3_obj->op_obj->ring0)
+				ssse3_obj->src.uint64[0] = * ((uint64_t*) (address));
+			else copyin (address, (char*) &ssse3_obj->src.uint64[0], 8);
+		}
 	} else {
-		// m128 load
-		int64_t disp = ssse3_obj->udo_src->lval.sqword;
-		uint8_t disp_size = ssse3_obj->udo_src->offset;
-		uint64_t address;
-		
-		if (ssse3_obj->udo_src->scale) goto bad; // TODO
+		_store_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, &ssse3_obj->dst.uint128);
+		if (ssse3_obj->udo_src->type == UD_OP_REG) {
+			_store_xmm (ssse3_obj->udo_src->base - UD_R_XMM0, &ssse3_obj->src.uint128);
+		} else {
+			// m128 load
+			int64_t disp = ssse3_obj->udo_src->lval.sqword;
+			uint8_t disp_size = ssse3_obj->udo_src->offset;
+			uint64_t address;
+			
+			if (ssse3_obj->udo_src->scale) goto bad; // TODO
 
-		if (retrieve_reg (ssse3_obj->op_obj->state,
-			ssse3_obj->udo_src->base, &address) != 0) goto bad;
+			if (retrieve_reg (ssse3_obj->op_obj->state,
+				ssse3_obj->udo_src->base, &address) != 0) goto bad;
 
-		address += disp;
+			address += disp;
 
-		if (ssse3_obj->op_obj->ring0)
-			ssse3_obj->src.uint128 = * ((__uint128_t*) (address));
-		else copyin (address, (char*) &ssse3_obj->src.uint128, 16);
+			if (ssse3_obj->op_obj->ring0)
+				ssse3_obj->src.uint128 = * ((__uint128_t*) (address));
+			else copyin (address, (char*) &ssse3_obj->src.uint128, 16);
+		}
 	}
 
 good:	return 0;
@@ -52,10 +72,11 @@ bad:	return -1;
  */
 int ssse3_commit_results(const ssse3_t *ssse3_obj)
 {
-	// TODO legacy mmx
-	if (ssse3_obj->islegacy) goto bad;
-
-	_load_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, (void*) &ssse3_obj->res.uint128);
+	if (ssse3_obj->islegacy) {
+		_load_mmx (ssse3_obj->udo_dst->base - UD_R_MM0, (void*) &ssse3_obj->res.uint64[0]);
+	} else {
+		_load_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, (void*) &ssse3_obj->res.uint128);
+	}
 
 good:	return 0;
 bad:	return -1;
@@ -118,7 +139,6 @@ ssse3_common:
 	if ((ssse3_obj.udo_dst->base >= UD_R_MM0)
 		&& (ssse3_obj.udo_dst->base <= UD_R_MM7)) {
 		ssse3_obj.islegacy = 1;
-		goto bad;
 	} else ssse3_obj.islegacy = 0;
 	
 	if (ssse3_grab_operands(&ssse3_obj) != 0) goto bad;
@@ -204,11 +224,12 @@ void pabsb (ssse3_t *this)
 {
 	const int8_t *src = &this->src.int8[0];
 	const int8_t *dst = &this->dst.int8[0];
-	uint8_t *res = &this->res.uint8[0];
+	int8_t *res = &this->res.int8[0];
 
 	int count = (this->islegacy) ? 8 : 16;
 	for (int i = 0; i < count; ++ i) {
 		if (*src < 0) *res = - *src;
+		else *res = *src;
 
 		++res; ++src; ++dst;
 	}
@@ -221,11 +242,12 @@ void pabsw (ssse3_t *this)
 {
 	const int16_t *src = &this->src.int16[0];
 	const int16_t *dst = &this->dst.int16[0];
-	uint16_t *res = &this->res.uint16[0];
+	int16_t *res = &this->res.int16[0];
 
 	int count = (this->islegacy) ? 4 : 8;
 	for (int i = 0; i < count; ++ i) {
 		if (*src < 0) *res = - *src;
+		else *res = *src;
 
 		++res; ++src; ++dst;
 	}
@@ -238,11 +260,12 @@ void pabsd (ssse3_t *this)
 {
 	const int32_t *src = &this->src.int32[0];
 	const int32_t *dst = &this->dst.int32[0];
-	uint32_t *res = &this->res.uint32[0];
+	int32_t *res = &this->res.int32[0];
 
 	int count = (this->islegacy) ? 2 : 4;
 	for (int i = 0; i < count; ++ i) {
 		if (*src < 0) *res = - *src;
+		else *res = *src;
 
 		++res; ++src; ++dst;
 	}
@@ -297,14 +320,15 @@ void pmulhrsw (ssse3_t *this)
 {
 	const int16_t *src = &this->src.int16[0];
 	const int16_t *dst = &this->dst.int16[0];
-	uint16_t *res = &this->res.uint16[0];
+	int16_t *res = &this->res.int16[0];
 
 	int count = (this->islegacy) ? 4 : 8;
 	for (int i = 0; i < count; ++i) {
-		uint32_t temp1 = (*dst) * (*src);
+		int32_t temp1 = (*dst) * (*src);
 		temp1 >>= 14;
 		temp1++;
-		*res = temp1;
+		temp1 >>= 1;
+		*res = temp1 & 0xFFFF;
 
 		++res; ++src; ++dst;
 	}
@@ -317,11 +341,11 @@ void pmaddubsw (ssse3_t *this)
 {
 	const int8_t *src = &this->src.int8[0];
 	const uint8_t *dst = &this->dst.uint8[0];
-	uint16_t *res = &this->res.uint16[0];
+	int16_t *res = &this->res.int16[0];
 
 	int count = (this->islegacy) ? 4 : 8;
 	for (int i = 0; i < count; ++i) {
-		int16_t temp1 = (src[0] * dst[0]) + (src[1] * dst[1]);
+		int64_t temp1 = (src[0] * dst[0]) + (src[1] * dst[1]);
 		*res = SATSW(temp1);
 
 		++res;
@@ -344,7 +368,6 @@ void phsubw (ssse3_t *this)
 		*res = (dst[0]) - (dst[1]);
 
 		++res;
-		src += 2;
 		dst += 2;
 	}
 	for (int i = 0; i < count; ++ i) {
@@ -352,7 +375,6 @@ void phsubw (ssse3_t *this)
 
 		++res;
 		src += 2;
-		dst += 2;
 	}
 }
 
@@ -370,7 +392,6 @@ void phsubd (ssse3_t *this)
 		*res = (dst[0]) - (dst[1]);
 
 		++res;
-		src += 2;
 		dst += 2;
 	}
 	for (int i = 0; i < count; ++ i) {
@@ -378,7 +399,6 @@ void phsubd (ssse3_t *this)
 
 		++res;
 		src += 2;
-		dst += 2;
 	}
 }
 
@@ -396,7 +416,6 @@ void phsubsw (ssse3_t *this)
 		*res = SATSW((dst[0]) - (dst[1]));
 
 		++res;
-		src += 2;
 		dst += 2;
 	}
 	for (int i = 0; i < count; ++ i) {
@@ -404,7 +423,6 @@ void phsubsw (ssse3_t *this)
 
 		++res;
 		src += 2;
-		dst += 2;
 	}
 }
 
@@ -422,7 +440,6 @@ void phaddw (ssse3_t *this)
 		*res = dst[0] + dst[1];
 
 		++res;
-		src += 2;
 		dst += 2;
 	}
 	for (int i = 0; i < count; ++ i) {
@@ -430,7 +447,6 @@ void phaddw (ssse3_t *this)
 
 		++res;
 		src += 2;
-		dst += 2;
 	}
 }
 
@@ -448,7 +464,6 @@ void phaddd (ssse3_t *this)
 		*res = dst[0] + dst[1];
 
 		++res;
-		src += 2;
 		dst += 2;
 	}
 	for (int i = 0; i < count; ++ i) {
@@ -456,7 +471,6 @@ void phaddd (ssse3_t *this)
 
 		++res;
 		src += 2;
-		dst += 2;
 	}
 }
 
@@ -474,7 +488,6 @@ void phaddsw (ssse3_t *this)
 		*res = SATSW(dst[0] + dst[1]);
 
 		++res;
-		src += 2;
 		dst += 2;
 	}
 	for (int i = 0; i < count; ++ i) {
@@ -482,7 +495,6 @@ void phaddsw (ssse3_t *this)
 
 		++res;
 		src += 2;
-		dst += 2;
 	}
 }
 

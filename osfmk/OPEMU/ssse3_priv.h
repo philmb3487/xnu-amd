@@ -69,6 +69,16 @@ typedef void (*ssse3_func)(ssse3_t*);
 	asm __volatile__ ("movdqu %0, %%xmm" #n :: "m" (*(where)));	\
 	} while (0);
 
+#define storeq_template(n, where)					\
+	do {								\
+	asm __volatile__ ("movq %%mm" #n ", %0" : "=m" (*(where)));	\
+	} while (0);
+
+#define loadq_template(n, where)					\
+	do {								\
+	asm __volatile__ ("movq %0, %%mm" #n :: "m" (*(where)));	\
+	} while (0);
+
 /**
  * Store xmm register somewhere in memory
  */
@@ -115,6 +125,38 @@ case 12: loaddqu_template(12, where); break;
 case 13: loaddqu_template(13, where); break;
 case 14: loaddqu_template(14, where); break;
 case 15: loaddqu_template(15, where); break;
+}}
+
+/**
+ * Store mmx register somewhere in memory
+ */
+inline void _store_mmx (const uint8_t n, uint64_t *where)
+{
+	switch (n) {
+case 0:  storeq_template(0, where); break;
+case 1:  storeq_template(1, where); break;
+case 2:  storeq_template(2, where); break;
+case 3:  storeq_template(3, where); break;
+case 4:  storeq_template(4, where); break;
+case 5:  storeq_template(5, where); break;
+case 6:  storeq_template(6, where); break;
+case 7:  storeq_template(7, where); break;
+}}
+
+/**
+ * Load mmx register from memory
+ */
+inline void _load_mmx (const uint8_t n, const uint64_t *where)
+{
+	switch (n) {
+case 0:  loadq_template(0, where); break;
+case 1:  loadq_template(1, where); break;
+case 2:  loadq_template(2, where); break;
+case 3:  loadq_template(3, where); break;
+case 4:  loadq_template(4, where); break;
+case 5:  loadq_template(5, where); break;
+case 6:  loadq_template(6, where); break;
+case 7:  loadq_template(7, where); break;
 }}
 
 inline int ssse3_grab_operands(ssse3_t*);

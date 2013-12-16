@@ -246,6 +246,24 @@ IORangeAllocator * IOPlatformExpert::getPhysicalRangeAllocator(void)
 			getProperty("Platform Memory Ranges")));
 }
 
+/**
+ * Generic restart routine using PCI chipset reset method
+ * Cheers Master Chief! (taken from OSXRestart)
+ */
+int PE_halt_restart_generic(unsigned int type)
+{
+	if ((type != kPEPanicRestartCPU) && (type != kPERestartCPU)
+		&& (type != kPEHangCPU)) return -1;
+
+	uint8_t zero_zone [40];
+	for (int i = 0; i < 40; ++i) zero_zone[i] = 0;
+
+	__asm__ volatile("outb %b0, %w1" : : "a" (0x2), "Nd" (0x0CF9));
+	IOSleep(100);
+	__asm__ volatile("outb %b0, %w1" : : "a" (0x6), "Nd" (0x0CF9));	
+
+	return -1;
+}
 int (*PE_halt_restart)(unsigned int type) = 0;
 
 int IOPlatformExpert::haltRestart(unsigned int type)
@@ -263,7 +281,7 @@ int IOPlatformExpert::haltRestart(unsigned int type)
   if (type == kPEPanicRestartCPU)
 	  type = kPERestartCPU;
 
-  if (PE_halt_restart) return (*PE_halt_restart)(type);
+  PE_halt_restart_generic();
   else return -1;
 }
 

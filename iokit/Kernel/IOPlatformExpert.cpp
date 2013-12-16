@@ -281,8 +281,7 @@ int IOPlatformExpert::haltRestart(unsigned int type)
   if (type == kPEPanicRestartCPU)
 	  type = kPERestartCPU;
 
-  PE_halt_restart_generic();
-  else return -1;
+  return (PE_halt_restart_generic(type));
 }
 
 void IOPlatformExpert::sleepKernel(void)

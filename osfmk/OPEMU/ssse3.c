@@ -24,7 +24,7 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 			_store_mmx (ssse3_obj->udo_src->base - UD_R_MM0, &ssse3_obj->src.uint64[0]);
 		} else {
 			// m64 load
-			int64_t disp = ssse3_obj->udo_src->lval.sqword;
+			int64_t disp = 0;
 			uint8_t disp_size = ssse3_obj->udo_src->offset;
 			uint64_t address;
 			
@@ -32,6 +32,13 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 
 			if (retrieve_reg (ssse3_obj->op_obj->state,
 				ssse3_obj->udo_src->base, &address) != 0) goto bad;
+
+			switch (disp_size) {
+			case 8: disp = ssse3_obj->udo_src->lval.sbyte; break;
+			case 16: disp = ssse3_obj->udo_src->lval.sword; break;
+			case 32: disp = ssse3_obj->udo_src->lval.sdword; break;
+			case 64: disp = ssse3_obj->udo_src->lval.sqword; break;
+			}
 
 			address += disp;
 
@@ -45,7 +52,7 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 			_store_xmm (ssse3_obj->udo_src->base - UD_R_XMM0, &ssse3_obj->src.uint128);
 		} else {
 			// m128 load
-			int64_t disp = ssse3_obj->udo_src->lval.sqword;
+			int64_t disp = 0;
 			uint8_t disp_size = ssse3_obj->udo_src->offset;
 			uint64_t address;
 			
@@ -53,6 +60,13 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 
 			if (retrieve_reg (ssse3_obj->op_obj->state,
 				ssse3_obj->udo_src->base, &address) != 0) goto bad;
+
+			switch (disp_size) {
+			case 8: disp = ssse3_obj->udo_src->lval.sbyte; break;
+			case 16: disp = ssse3_obj->udo_src->lval.sword; break;
+			case 32: disp = ssse3_obj->udo_src->lval.sdword; break;
+			case 64: disp = ssse3_obj->udo_src->lval.sqword; break;
+			}
 
 			address += disp;
 

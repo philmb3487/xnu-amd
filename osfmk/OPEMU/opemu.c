@@ -189,9 +189,14 @@ int retrieve_reg(/*const*/ x86_saved_state_t *state, const ud_type_t base, uint6
 
 	switch (base) {
 
+	case UD_NONE:
+		*where = 0;
+		break;
+
 	// TODO what if 32?
 	case UD_R_RIP:
 		*where = ss64 -> isf.rip;
+		break;
 
 	case UD_R_RAX:
 		*where = ss64 -> rax;

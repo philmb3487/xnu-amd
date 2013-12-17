@@ -263,7 +263,7 @@ commpage_init_cpu_capabilities( void )
 #define MAVERICKS_AMD
 #ifdef MAVERICKS_AMD
 		bits |= kHasSSE3;
-		bits |= kHasSupplementalSSE3;
+	//	bits |= kHasSupplementalSSE3;
 		bits &= ~kHasSSE4_2;
 #endif
 	}

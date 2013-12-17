@@ -112,6 +112,17 @@ int op_sse3x_run(const op_t *op_obj)
 	ssse3_func opf;
 
 	switch (mnemonic) {
+	case UD_Ipcmpestri:	panic ();
+	case UD_Ipcmpestrm:	panic ();
+	case UD_Ipcmpistri:	opf = pcmpistri; goto sse42_common;
+	case UD_Ipcmpistrm:	panic ();
+	case UD_Ipcmpgtq:	panic ();
+sse42_common:
+	
+
+	goto ssse3_common;
+
+
 	case UD_Ipsignb:	opf = psignb;	goto ssse3_common;
 	case UD_Ipsignw:	opf = psignw;	goto ssse3_common;
 	case UD_Ipsignd:	opf = psignd;	goto ssse3_common;

@@ -12,16 +12,16 @@
  * For 64-bit operations, use the same register type, and ignore the high values
  */
 union __attribute__((__packed__)) sse_reg {
-int8_t		int8[16];
-int16_t		int16[8];
-int32_t		int32[4];
-int64_t		int64[2];
-__int128_t	int128;
-uint8_t		uint8[16];
-uint16_t	uint16[8];
-uint32_t	uint32[4];
-uint64_t	uint64[2];
-__uint128_t	uint128;
+	int8_t		int8[16];
+	int16_t		int16[8];
+	int32_t		int32[4];
+	int64_t		int64[2];
+	__int128_t	int128;
+	uint8_t		uint8[16];
+	uint16_t	uint16[8];
+	uint32_t	uint32[4];
+	uint64_t	uint64[2];
+	__uint128_t	uint128;
 };
 typedef union sse_reg sse_reg_t;
 
@@ -179,4 +179,8 @@ inline void phsubsw	(ssse3_t*);
 inline void phaddw	(ssse3_t*);
 inline void phaddd	(ssse3_t*);
 inline void phaddsw	(ssse3_t*);
+
+/*** SSE4.2 TODO move this somewhere else ***/
+inline void pcmpistri	(ssse3_t*);
+
 

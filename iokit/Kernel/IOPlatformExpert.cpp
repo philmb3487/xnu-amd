@@ -246,12 +246,149 @@ IORangeAllocator * IOPlatformExpert::getPhysicalRangeAllocator(void)
 			getProperty("Platform Memory Ranges")));
 }
 
+
+/**
+ * -Sinetek
+ * Perform an ACPI shutdown by looking up the \_S5 object inside the DSDT.
+ */
+/*** Globals used in shutdown ***/
+uint32_t PM1a_CNT, PM1b_CNT;
+uint16_t SLP_TYPa, SLP_TYPb;
+/***/
+int SACPIPerformShutdown()
+{
+    OSDictionary *services;
+    
+    IOService *aape = NULL;
+    
+    services = IOService::serviceMatching("AppleACPIPlatformExpert");
+    if (!services) return -1;
+    
+    OSIterator *iterator = IOService::getMatchingServices(services);
+    if (!iterator) return -1;
+    
+    while (1) {
+        aape = OSDynamicCast(IOService, iterator->getNextObject());
+        if (!aape) break;
+        
+        // just take the first one. there should only be one AppleACPIPlatformExpert
+        break;
+    }
+    
+    iterator->release();
+    services->release();
+    
+    if (!aape) return -1;
+    
+    printf ("found: %s\n", aape->getName());
+
+    OSDictionary *dic;
+    dic = OSDynamicCast(OSDictionary, aape->getProperty("ACPI Tables"));
+    
+    if (dic) {
+        
+        /** FACT contains the value of the port to write **/
+
+        OSData *FACP_data, *DSDT_data;
+        FACP_data = OSDynamicCast(OSData, dic->getObject("FACP"));
+        DSDT_data = OSDynamicCast(OSData, dic->getObject("DSDT"));
+        
+        if (FACP_data) {
+            /** See ACPI specification for offset and more info **/
+
+            printf ("got FACP data, count = %d\n", FACP_data->getLength());
+            
+            PM1a_CNT = * (uint32_t *) FACP_data->getBytesNoCopy(64, 4);
+            PM1b_CNT = * (uint32_t *) FACP_data->getBytesNoCopy(68, 4);
+
+            printf ("PM1a_CNT_BLK = %08x\n", PM1a_CNT);
+            printf ("PM1b_CNT_BLK = %08x\n", PM1b_CNT);
+
+        } else return -1;
+        
+        /** DSDT contains the \_S5 sleep state object **/
+
+        if (DSDT_data) {
+            uint8_t *_S5_ = NULL, *PC = NULL;
+            
+            /**
+             * Ideally we'd have a full-blown AML parser available. We'll have to do
+             * with looking for the "_S5_" name directly, grabbing its contents
+             */
+            int len = DSDT_data->getLength();
+            uint8_t *DSDT_bytes = (uint8_t*) DSDT_data->getBytesNoCopy();
+            
+            printf ("got DSDT data, count = %d\n", len);
+            
+            for (int i = 0; i < len - 4 ; ++i) {
+                if (memcmp("_S5_", DSDT_bytes + i, 4) == 0) {
+                    printf("found \\_S5_ @ 0x%x\n", i);
+                    _S5_ = DSDT_bytes + i;
+                    break;
+                }
+            }
+            
+            if (!_S5_) return -1;
+            
+            /* now interpret the AML at that _S5_ position */
+            PC = _S5_ + 4; // skip the _S5_ string
+            
+            if ( *PC == 0x12) {
+                /** Package OP: **/
+                
+                PC++;
+                /* Package size */
+                PC++;
+                /* Number of elements */
+                PC++;
+                /* SLP_TYPa */
+                PC++; // byte prefix
+                SLP_TYPa = *PC;
+                PC++;
+                /* SLP_TYPb */
+                PC++; // byte prefix
+                SLP_TYPb = *(PC);
+                
+            } else return -1;
+            
+            /* Bring back the SPL values to bit 12:10 for the CTRL port */
+            SLP_TYPa <<= 10;
+            SLP_TYPb <<= 10;
+            
+            /** We're all done here, write to the port. Auf Wiedersehen! **/
+            printf ("About to write to port, our final values are: SLP_TYPa = %0x, SLP_TYPb = %0x\n",
+                    SLP_TYPa, SLP_TYPb);
+            
+            const uint16_t SLP_EN = (1 << 13);
+            
+                __asm__ volatile("out %w0, %w1" : : "a" (SLP_TYPa | SLP_EN), "Nd" (PM1a_CNT));
+            if(PM1b_CNT) {
+                __asm__ volatile("out %w0, %w1" : : "a" (SLP_TYPb | SLP_EN), "Nd" (PM1b_CNT));
+            }
+            
+            /*** NOTREACHED ***/
+            
+        } else return -1;
+        
+    } else return -1;
+    
+    
+    return 0;
+}
+
 /**
  * Generic restart routine using PCI chipset reset method
  * Cheers Master Chief! (taken from OSXRestart)
  */
 int PE_halt_restart_generic(unsigned int type)
 {
+	if (type == kPEHaltCPU)
+	{
+		SACPIPerformShutdown ();
+
+		/*** NOTREACHED ***/
+	}
+
 	if ((type != kPEPanicRestartCPU) && (type != kPERestartCPU)
 		&& (type != kPEHangCPU)) return -1;
 

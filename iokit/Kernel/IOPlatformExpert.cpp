@@ -251,12 +251,13 @@ IORangeAllocator * IOPlatformExpert::getPhysicalRangeAllocator(void)
  * -Sinetek
  * Perform an ACPI shutdown by looking up the \_S5 object inside the DSDT.
  */
-/*** Globals used in shutdown ***/
-uint32_t PM1a_CNT, PM1b_CNT;
-uint16_t SLP_TYPa, SLP_TYPb;
-/***/
 int SACPIPerformShutdown()
 {
+	/*** Globals used in shutdown ***/
+	uint32_t PM1a_CNT, PM1b_CNT;
+	uint16_t SLP_TYPa, SLP_TYPb;
+	/***/
+
     OSDictionary *services;
     
     IOService *aape = NULL;
@@ -377,30 +378,78 @@ int SACPIPerformShutdown()
 }
 
 /**
- * Generic restart routine using PCI chipset reset method
- * Cheers Master Chief! (taken from OSXRestart)
+ * Sinetek
+ * Perform an ACPI reboot by looking up the reset vector in the FACP.
  */
-int PE_halt_restart_generic(unsigned int type)
+int SACPIPerformReboot()
 {
-	if (type == kPEHaltCPU)
-	{
-		SACPIPerformShutdown ();
+	/*** Globals used in reboot ***/
+	uint64_t reset_port;
+	uint8_t reset_value;
+	/***/
 
-		/*** NOTREACHED ***/
-	}
+    OSDictionary *services;
+    
+    IOService *aape = NULL;
+    
+    services = IOService::serviceMatching("AppleACPIPlatformExpert");
+    if (!services) return -1;
+    
+    OSIterator *iterator = IOService::getMatchingServices(services);
+    if (!iterator) return -1;
+    
+    while (1) {
+        aape = OSDynamicCast(IOService, iterator->getNextObject());
+        if (!aape) break;
+        
+        // just take the first one. there should only be one AppleACPIPlatformExpert
+        break;
+    }
+    
+    iterator->release();
+    services->release();
+    
+    if (!aape) return -1;
+    
+    printf ("found: %s\n", aape->getName());
 
-	if ((type != kPEPanicRestartCPU) && (type != kPERestartCPU)
-		&& (type != kPEHangCPU)) return -1;
+    OSDictionary *dic;
+    dic = OSDynamicCast(OSDictionary, aape->getProperty("ACPI Tables"));
+    
+    if (dic) {
+        
+        /** FACP contains the value of the port to write **/
 
-	uint8_t zero_zone [40];
-	for (int i = 0; i < 40; ++i) zero_zone[i] = 0;
+        OSData *FACP_data;
+        FACP_data = OSDynamicCast(OSData, dic->getObject("FACP"));
+        
+        if (FACP_data) {
+            /** See ACPI specification for offset and more info **/
 
-	__asm__ volatile("outb %b0, %w1" : : "a" (0x2), "Nd" (0x0CF9));
-	IOSleep(100);
-	__asm__ volatile("outb %b0, %w1" : : "a" (0x6), "Nd" (0x0CF9));	
+            printf ("got FACP data, count = %d\n", FACP_data->getLength());
+            
+            reset_port = * (uint64_t *) FACP_data->getBytesNoCopy(120, 8);
+            reset_value = * (uint8_t *) FACP_data->getBytesNoCopy(128, 1);
 
-	return -1;
+            printf ("reset_port = %016llx\n", reset_port);
+            printf ("reset_value = %08x\n", reset_value);
+
+
+	// do svidanya
+		while (1) {
+			IOSleep(100);
+			__asm__ volatile("outb %b0, %w1" : : "a" (reset_value), "Nd" (reset_port));
+		}
+
+        } else return -1;
+        
+        
+    } else return -1;
+    
+    
+    return 0;
 }
+
 int (*PE_halt_restart)(unsigned int type) = 0;
 
 int IOPlatformExpert::haltRestart(unsigned int type)
@@ -418,7 +467,11 @@ int IOPlatformExpert::haltRestart(unsigned int type)
   if (type == kPEPanicRestartCPU)
 	  type = kPERestartCPU;
 
-  return (PE_halt_restart_generic(type));
+  if (type == kPERestartCPU) SACPIPerformReboot();
+
+  SACPIPerformShutdown();
+
+  return -1;
 }
 
 void IOPlatformExpert::sleepKernel(void)

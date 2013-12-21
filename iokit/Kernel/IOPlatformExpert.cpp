@@ -288,7 +288,7 @@ int SACPIPerformShutdown()
     
     if (dic) {
         
-        /** FACT contains the value of the port to write **/
+        /** FACP contains the value of the port to write **/
 
         OSData *FACP_data, *DSDT_data;
         FACP_data = OSDynamicCast(OSData, dic->getObject("FACP"));
@@ -374,7 +374,7 @@ int SACPIPerformShutdown()
     } else return -1;
     
     
-    return 0;
+    return -1;
 }
 
 /**
@@ -431,6 +431,10 @@ int SACPIPerformReboot()
             reset_port = * (uint64_t *) FACP_data->getBytesNoCopy(120, 8);
             reset_value = * (uint8_t *) FACP_data->getBytesNoCopy(128, 1);
 
+	// else reset to the default PCI bus reset.
+	if (!reset_port) reset_port = 0x0cf9;
+	if (!reset_value) reset_value = 7;
+
             printf ("reset_port = %016llx\n", reset_port);
             printf ("reset_value = %08x\n", reset_value);
 
@@ -447,7 +451,7 @@ int SACPIPerformReboot()
     } else return -1;
     
     
-    return 0;
+    return -1;
 }
 
 int (*PE_halt_restart)(unsigned int type) = 0;

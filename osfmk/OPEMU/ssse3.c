@@ -76,7 +76,9 @@ int ssse3_grab_operands(ssse3_t *ssse3_obj)
 		}
 	}
 
-good:	return 0;
+    return 0;
+
+    // Only reached if bad
 bad:	return -1;
 }
 
@@ -92,8 +94,10 @@ int ssse3_commit_results(const ssse3_t *ssse3_obj)
 		_load_xmm (ssse3_obj->udo_dst->base - UD_R_XMM0, (void*) &ssse3_obj->res.uint128);
 	}
 
-good:	return 0;
-bad:	return -1;
+    return 0;
+
+    // Only reached if bad
+//bad:	return -1;
 }
 
 
@@ -112,11 +116,11 @@ int op_sse3x_run(const op_t *op_obj)
 	ssse3_func opf;
 
 	switch (mnemonic) {
-	case UD_Ipcmpestri:	panic ();
-	case UD_Ipcmpestrm:	panic ();
+    case UD_Ipcmpestri:	opf = pcmpestri; goto sse42_common;
+	case UD_Ipcmpestrm:	opf = pcmpestrm; goto sse42_common;
 	case UD_Ipcmpistri:	opf = pcmpistri; goto sse42_common;
-	case UD_Ipcmpistrm:	panic ();
-	case UD_Ipcmpgtq:	panic ();
+    case UD_Ipcmpistrm: opf = pcmpistrm; goto sse42_common;
+    case UD_Ipcmpgtq:	opf = pcmpgtq;   goto sse42_common;
 sse42_common:
 	
 
@@ -179,6 +183,8 @@ ssse3_common:
 
 good:
 	return 0;
+
+    // Only reached if bad
 bad:
 	return -1;
 }
@@ -310,13 +316,16 @@ void palignr (ssse3_t *this)
 		temp1 >>= (imm * 8);
 		this->res.uint128 = temp1;
 	} else {
+        // AnV - Cast fixed
 		__uint128_t temp1[2];
 		uint8_t *shiftp; // that type matters for pointer arithmetic
+        uint64_t shiftpaddr;
 		temp1[0] = this->src.uint128;
 		temp1[1] = this->dst.uint128;
 		shiftp = (uint8_t*) &temp1[0];
 		shiftp += imm;
-		this->res.uint128 = * ((__uint128_t*) shiftp);
+        shiftpaddr = (uint64_t)shiftp;
+		this->res.uint128 = * ((__uint128_t*) shiftpaddr);
 	}
 }
 

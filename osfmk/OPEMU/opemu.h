@@ -31,7 +31,7 @@ typedef struct op op_t;
  * Trap handlers, analogous to a program's entry point
  * @param state: xnu's trap.c saved thread state
  */
-void opemu_ktrap(x86_saved_state_t *state);
+int opemu_ktrap(x86_saved_state_t *state);
 void opemu_utrap(x86_saved_state_t *state) __attribute__((noreturn));
 
 
@@ -40,6 +40,8 @@ void opemu_utrap(x86_saved_state_t *state) __attribute__((noreturn));
  */
 extern void mach_call_munger(x86_saved_state_t *state);
 extern void unix_syscall(x86_saved_state_t *);
+extern void mach_call_munger64(x86_saved_state_t *state);
+extern void unix_syscall64(x86_saved_state_t *);
 
 int retrieve_reg(/*const*/ x86_saved_state_t *, const ud_type_t, uint64_t *);
 
@@ -47,4 +49,5 @@ int retrieve_reg(/*const*/ x86_saved_state_t *, const ud_type_t, uint64_t *);
  * Entry points for the "plugins"
  */
 extern int op_sse3x_run(const op_t*);
+extern int op_sse3_run(const op_t*);
 

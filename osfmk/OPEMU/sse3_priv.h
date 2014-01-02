@@ -8,7 +8,7 @@
 #define D	printf
 
 /**
- * 128-bit Register proper for ssse3
+ * 128-bit Register proper for sse3
  * For 64-bit operations, use the same register type, and ignore the high values
  */
 union __attribute__((__packed__)) sse_reg {
@@ -17,10 +17,12 @@ union __attribute__((__packed__)) sse_reg {
 	int32_t		int32[4];
 	int64_t		int64[2];
 	__int128_t	int128;
+    float       fa32[4];
 	uint8_t		uint8[16];
 	uint16_t	uint16[8];
 	uint32_t	uint32[4];
 	uint64_t	uint64[2];
+    double      fa64[2];
 	__uint128_t	uint128;
 };
 typedef union sse_reg sse_reg_t;
@@ -32,9 +34,9 @@ typedef union sse_reg sse_reg_t;
 #define print128(x)	printf("0x%016llx%016llx", ((uint64_t*)(&(x)))[1], ((uint64_t*)(&(x)))[0] );
 
 /**
- * ssse3 object
+ * sse3 object
  */
-struct ssse3 {
+struct sse3 {
 	uint8_t	extended;	// bool type
 
 	sse_reg_t		dst, src;
@@ -49,14 +51,14 @@ struct ssse3 {
 	// legacy mmx flag
 	uint8_t 		islegacy;
 };
-typedef struct ssse3 ssse3_t;
+typedef struct sse3 sse3_t;
 
 
 
 /**
  * Instruction emulation function type.
  */
-typedef void (*ssse3_func)(ssse3_t*);
+typedef void (*sse3_func)(sse3_t*);
 
 
 #define storedqu_template(n, where)					\
@@ -159,30 +161,22 @@ case 6:  loadq_template(6, where); break;
 case 7:  loadq_template(7, where); break;
 }}
 
-inline int ssse3_grab_operands(ssse3_t*);
-inline int ssse3_commit_results(const ssse3_t*);
-inline int op_sse3x_run(const op_t*);
+inline int sse3_grab_operands(sse3_t*);
+inline int sse3_commit_results(const sse3_t*);
+inline int op_sse3_run(const op_t*);
 
-inline void psignb	(ssse3_t*);
-inline void psignw	(ssse3_t*);
-inline void psignd	(ssse3_t*);
-inline void pabsb	(ssse3_t*);
-inline void pabsw	(ssse3_t*);
-inline void pabsd	(ssse3_t*);
-inline void palignr	(ssse3_t*);
-inline void pshufb	(ssse3_t*);
-inline void pmulhrsw	(ssse3_t*);
-inline void pmaddubsw	(ssse3_t*);
-inline void phsubw	(ssse3_t*);
-inline void phsubd	(ssse3_t*);
-inline void phsubsw	(ssse3_t*);
-inline void phaddw	(ssse3_t*);
-inline void phaddd	(ssse3_t*);
-inline void phaddsw	(ssse3_t*);
-
-/*** SSE4.2 TODO move this somewhere else ***/
-inline void pcmpistri	(ssse3_t*);
-inline void pcmpestri	(ssse3_t*);
-inline void pcmpestrm	(ssse3_t*);
-inline void pcmpistrm	(ssse3_t*);
-inline void pcmpgtq     (ssse3_t*);
+/** AnV - SSE3 instructions **/
+inline void addsubpd   (sse3_t*);
+inline void addsubps   (sse3_t*);
+inline void haddpd     (sse3_t*);
+inline void haddps     (sse3_t*);
+inline void hsubpd     (sse3_t*);
+inline void hsubps     (sse3_t*);
+inline void lddqu      (sse3_t*);
+inline void movddup    (sse3_t*);
+inline void movshdup   (sse3_t*);
+inline void movsldup   (sse3_t*);
+inline void fisttp     (sse3_t*);
+inline void fisttps    (float *res);
+inline void fisttpl    (double *res);
+inline void fisttpq    (long double *res);

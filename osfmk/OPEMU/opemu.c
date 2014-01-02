@@ -20,12 +20,17 @@ IM      ~ SINETEK
  *   exceptions coming from kernel space.
  *
  * STATUS
- *  . RDMSR is implemented.
+ *  . RDMSR/WRMSR is implemented.
  *  . SYSENTER is implemented.
+ *  . SYSEXIT is implemented
  *  . SSSE3 is implemented.
+ *  . SSE42 is partly implemented. (Needs testing)
+ *  . SSE3 is implemented. (Needs testing)
  *
  * HISTORY
  *  . SINETEK  Big cleanup, bumping version
+ *  . AnV Added sysexit, adapt opemu ktrap
+ *  . AnV Added a few SSE42 instructions
  */
 #include <stdint.h>
 #include <i386/trap.h>
@@ -37,7 +42,7 @@ IM      ~ SINETEK
  * and for now that is x86_64 only, so we simplify things,
  * and assume everything runs in x86_64.
  */
-void opemu_ktrap(x86_saved_state_t *state)
+int opemu_ktrap(x86_saved_state_t *state)
 {
 	x86_saved_state64_t *saved_state = saved_state64(state);
 	const uint8_t *code_stream = (const uint8_t*) saved_state->isf.rip;
@@ -59,9 +64,12 @@ void opemu_ktrap(x86_saved_state_t *state)
 	/* since this is ring0, it could be an invalid MSR read.
 	 * Instead of crashing the whole machine, report on it and keep running. */
 	if (mnemonic == UD_Irdmsr) {
-		printf("[MSR] unknown location 0x%016llx\r\n", saved_state->rcx);
+		printf ("[RDMSR] unknown location 0x%016llx\r\n", saved_state->rcx);
 		// best we can do is return 0;
 		saved_state->rdx = saved_state->rax = 0;
+		goto cleanexit;
+	} else if (mnemonic == UD_Iwrmsr) {
+		printf ("[WRMSR] unknown location 0x%016llx\r\n", saved_state->rcx);
 		goto cleanexit;
 	}
 
@@ -78,6 +86,12 @@ void opemu_ktrap(x86_saved_state_t *state)
 
 	error |= op_sse3x_run(&op_obj);
 
+    if (error)
+    {
+        error = 0;
+        error |= op_sse3_run(&op_obj);
+    }
+
 	if (!error) goto cleanexit;
 
 	/** fallthru **/
@@ -88,11 +102,12 @@ bad:
 		instruction_asm = ud_insn_asm(&ud_obj);
 
 		printf ( "OPEMU:  %s\n", instruction_asm) ;
-		panic ( );
+		return 0;
 	}
 
 cleanexit:
 	saved_state->isf.rip += bytes_skip;
+    return 1;
 }
 
 /**
@@ -128,21 +143,50 @@ void opemu_utrap(x86_saved_state_t *state)
 
 	/* It could be a sysenter instruction, which translates to a system call
 	 * (both mach and bsd calls)
-	 * To my knowledge all x86_64 platforms support it in long mode.
 	 */
 	if (mnemonic == UD_Isysenter) {
-		saved_state32(state)->eip = saved_state32(state)->edx;
-		saved_state32(state)->uesp = saved_state32(state)->ecx;
+        if (islongmode)
+        {
+            saved_state64(state)->isf.rip = saved_state64(state)->rdx;
+            saved_state64(state)->isf.rsp = saved_state64(state)->rcx;
+            
+            if ((signed) saved_state64(state)->rax < 0) {
+                mach_call_munger64(state);
+            } else {
+                unix_syscall64(state);
+            }
+        } else {
+            saved_state32(state)->eip = saved_state32(state)->edx;
+            saved_state32(state)->uesp = saved_state32(state)->ecx;
 
-		if ((signed) saved_state32(state)->eax < 0) {
-			mach_call_munger(state);
-		} else {
-			unix_syscall(state);
-		}
+            if ((signed) saved_state32(state)->eax < 0) {
+                mach_call_munger(state);
+            } else {
+                unix_syscall(state);
+            }
+        }
 		/** NOTREACHED **/
 		__builtin_unreachable(); // clang extension
 	}
-	
+
+    /* It could be a sysexit instruction, which translates to a specific return */
+    if (mnemonic == UD_Isysexit) {
+        if (islongmode)
+        {
+            saved_state64(state)->isf.rip = saved_state64(state)->rdx;
+            saved_state64(state)->isf.rsp = saved_state64(state)->rcx;
+            
+            thread_exception_return();
+        } else {
+            saved_state32(state)->eip = saved_state32(state)->edx;
+            saved_state32(state)->uesp = saved_state32(state)->ecx;
+            
+            thread_exception_return();
+        }
+		/** NOTREACHED **/
+		__builtin_unreachable(); // clang extension
+    }
+
 	// fill in the opemu object
 	op_obj.state = state;
 	op_obj.state64 = saved_state64(state);
@@ -153,6 +197,12 @@ void opemu_utrap(x86_saved_state_t *state)
 
 	error |= op_sse3x_run(&op_obj);
 
+    if (error)
+    {
+        error = 0;
+        error |= op_sse3_run(&op_obj);
+    }
+    
 	if (!error) goto cleanexit;
 
 	/** fallthru **/
@@ -300,7 +350,10 @@ int retrieve_reg(/*const*/ x86_saved_state_t *state, const ud_type_t base, uint6
 
 	}		
 
-good:	return 0;
-bad:	return -1;
+    return 0;
+
+    // Only reached if bad
+bad:
+    return -1;
 }
 

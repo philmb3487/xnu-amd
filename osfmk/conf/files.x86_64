@@ -135,3 +135,14 @@ osfmk/kperf/x86_64/kperf_mp.c   optional kperf
 osfmk/i386/startup64.c		standard
 osfmk/x86_64/idt64.s		standard
 
+osfmk/OPEMU/opemu.c		standard
+osfmk/OPEMU/opemu_math.c	standard
+osfmk/OPEMU/ssse3.c		standard
+osfmk/OPEMU/sse42.c		standard
+osfmk/OPEMU/sse3.c		standard
+osfmk/OPEMU/libudis86/decode.c standard
+osfmk/OPEMU/libudis86/itab.c standard
+osfmk/OPEMU/libudis86/syn.c standard
+osfmk/OPEMU/libudis86/syn-intel.c standard
+osfmk/OPEMU/libudis86/udis86.c standard
+
